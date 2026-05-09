@@ -48,17 +48,19 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { auth } from "./firebase";
 
 import {
-    createUserWithEmailAndPassword,
-    onAuthStateChanged,
-    signInWithEmailAndPassword,
-    signOut,
-    User,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  signOut,
+  User,
 } from "firebase/auth";
 
 type AuthContextType = {
   user: User | null;
   signUp: (email: string, password: string) => Promise<string | null>;
   signIn: (email: string, password: string) => Promise<string | null>;
+  resetPassword: (email: string) => Promise<string | null>;
   logout: () => Promise<void>;
 };
 
@@ -95,12 +97,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return null;
+    } catch (error) {
+      if (error instanceof Error) return error.message;
+      return "An error occurred while sending reset email.";
+    }
+  };
+
   const logout = async () => {
     await signOut(auth);
   };
 
   return (
-    <AuthContext.Provider value={{ user, signUp, signIn, logout }}>
+    <AuthContext.Provider
+      value={{ user, signUp, signIn, resetPassword, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

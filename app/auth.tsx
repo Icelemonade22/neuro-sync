@@ -1,8 +1,20 @@
 import { useAuth } from "@/config/auth-context";
+import { auth } from "@/config/firebase";
+import { checkOnboardingCompleted } from "@/src/services/checkOnboarding";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  View,
+} from "react-native";
 import { Button, Text, TextInput, useTheme } from "react-native-paper";
+
+const isValidEmail = (email: string) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
 
 export default function AuthScreen() {
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
@@ -13,7 +25,7 @@ export default function AuthScreen() {
   const theme = useTheme();
   const router = useRouter();
 
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
 
   // It will handle both creating and signIn in to the account
   const handleAuth = async () => {
@@ -22,32 +34,110 @@ export default function AuthScreen() {
       return;
     }
 
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
     if (password.length < 8) {
-      setError("Passwords must be at least 6 characters long.");
+      setError("Password must be at least 8 characters long.");
       return;
     }
 
     setError(null);
 
     if (isSignUp) {
-      const error = await signUp(email, password);
+      const error = await signUp(email.trim(), password);
       if (error) {
         setError(error);
         return;
       }
+      Alert.alert(
+        "Welcome to NeuroSync 🧠",
+        "Your account is ready. Please sign in to continue.",
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              setIsSignUp(false);
+              setPassword("");
+              setError(null);
+            },
+          },
+        ],
+      );
+      return;
     } else {
-      const error = await signIn(email, password);
+      const error = await signIn(email.trim(), password);
       if (error) {
         setError(error);
         return;
       }
 
-      router.replace("/");
+      const user = auth.currentUser;
+
+      if (!user) return;
+
+      const completed = await checkOnboardingCompleted(user.uid);
+
+      if (completed) {
+        router.replace("/(tabs)");
+      } else {
+        router.replace("/onboarding");
+      }
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError("Please enter your email address first.");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    const error = await resetPassword(email.trim().toLowerCase());
+
+    if (error) {
+      setError(error);
+      return;
+    }
+
+    setError("Password reset email has been sent. Please check your inbox.");
+  };
+
+  const getPasswordChecks = (password: string) => {
+    return {
+      length: password.length >= 8,
+      number: /\d/.test(password),
+      lowercase: /[a-z]/.test(password),
+      uppercase: /[A-Z]/.test(password),
+      special: /[^A-Za-z0-9]/.test(password),
+    };
+  };
+
+  const getPasswordStrength = (password: string) => {
+    const checks = getPasswordChecks(password);
+    const score = Object.values(checks).filter(Boolean).length;
+
+    if (score <= 2)
+      return { label: "Weak password", progress: "25%", color: "#ef4444" };
+    if (score <= 4)
+      return { label: "Medium password", progress: "60%", color: "#f59e0b" };
+    return { label: "Strong password", progress: "100%", color: "#22c55e" };
+  };
+
+  const checks = getPasswordChecks(password);
+  const strength = getPasswordStrength(password);
+
   const handleSwitchMode = () => {
     setIsSignUp((prev) => !prev);
+    setEmail("");
+    setPassword("");
+    setError(null);
   };
 
   return (
@@ -62,16 +152,18 @@ export default function AuthScreen() {
 
         <TextInput
           label="Email"
+          value={email}
           autoCapitalize="none"
           keyboardType="email-address"
           placeholder="example@gmail.com"
           mode="outlined"
           style={styles.input}
-          onChangeText={setEmail}
+          onChangeText={(text) => setEmail(text.trim().toLowerCase())}
         />
 
         <TextInput
           label="Password"
+          value={password}
           autoCapitalize="none"
           mode="outlined"
           secureTextEntry
@@ -79,11 +171,59 @@ export default function AuthScreen() {
           onChangeText={setPassword}
         />
 
+        {isSignUp && password.length > 0 && (
+          <View style={styles.passwordBox}>
+            <View style={styles.progressBackground}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: strength.progress as any,
+                    backgroundColor: strength.color,
+                  },
+                ]}
+              />
+            </View>
+
+            <Text style={styles.strengthText}>
+              {strength.label}. Must contain:
+            </Text>
+
+            <Text style={[styles.checkText, checks.length && styles.validText]}>
+              {checks.length ? "✓" : "×"} At least 8 characters
+            </Text>
+            <Text style={[styles.checkText, checks.number && styles.validText]}>
+              {checks.number ? "✓" : "×"} At least 1 number
+            </Text>
+            <Text
+              style={[styles.checkText, checks.lowercase && styles.validText]}
+            >
+              {checks.lowercase ? "✓" : "×"} At least 1 lowercase letter
+            </Text>
+            <Text
+              style={[styles.checkText, checks.uppercase && styles.validText]}
+            >
+              {checks.uppercase ? "✓" : "×"} At least 1 uppercase letter
+            </Text>
+            <Text
+              style={[styles.checkText, checks.special && styles.validText]}
+            >
+              {checks.special ? "✓" : "×"} At least 1 special character
+            </Text>
+          </View>
+        )}
+
         {error && <Text style={{ color: theme.colors.error }}>{error}</Text>}
 
         <Button mode="contained" style={styles.button} onPress={handleAuth}>
           {isSignUp ? "Sign Up" : "Sign In"}
         </Button>
+
+        {!isSignUp && (
+          <Button mode="text" onPress={handleForgotPassword}>
+            Forgot Password?
+          </Button>
+        )}
 
         <Button
           mode="text"
@@ -121,5 +261,33 @@ const styles = StyleSheet.create({
   },
   switchModeButton: {
     marginTop: 16,
+  },
+  passwordBox: {
+    marginTop: -8,
+    marginBottom: 16,
+  },
+  progressBackground: {
+    height: 4,
+    backgroundColor: "#ddd",
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  progressFill: {
+    height: 4,
+    borderRadius: 10,
+  },
+  strengthText: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 6,
+    color: "#555",
+  },
+  checkText: {
+    fontSize: 13,
+    color: "#888",
+    marginBottom: 4,
+  },
+  validText: {
+    color: "#22c55e",
   },
 });
