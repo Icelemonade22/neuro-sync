@@ -60,7 +60,19 @@ export default function TabsLayout() {
           },
         }}
       />
-      <Tabs.Screen name="login" options={{ title: "Login" }} />
+      <Tabs.Screen
+        name="requests"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="rooms"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

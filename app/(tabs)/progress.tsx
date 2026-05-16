@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 20,
   },
   center: {
     flex: 1,

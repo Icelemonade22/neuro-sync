@@ -1,14 +1,17 @@
 import { auth } from "@/config/firebase";
+import { sendBuddyRequest } from "@/src/services/buddyRequestService";
 import { getStudyBuddies } from "@/src/services/getStudyBuddies";
 import { getUserProfile } from "@/src/services/getUserProfile";
 import { calculateCompatibility } from "@/src/utils/calculateCompatibility";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Text } from "react-native-paper";
 
@@ -38,6 +41,23 @@ export default function BuddiesScreen() {
     setLoading(false);
   };
 
+  const handleConnect = async (buddy: any) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const currentProfile = await getUserProfile(user.uid);
+
+    await sendBuddyRequest({
+      fromUserId: user.uid,
+      fromName: currentProfile?.fullName ?? "Student",
+      toUserId: buddy.uid,
+      toName: buddy.fullName ?? "Student",
+      compatibility: buddy.compatibility,
+    });
+
+    Alert.alert("Request Sent", `Buddy request sent to ${buddy.fullName}.`);
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -55,6 +75,22 @@ export default function BuddiesScreen() {
       <Text style={styles.subtitle}>
         Matched based on subject, focus level, study style, and availability.
       </Text>
+
+      <View style={styles.quickActions}>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/requests")}
+        >
+          <Text style={styles.actionText}>Requests</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/rooms")}
+        >
+          <Text style={styles.actionText}>Rooms</Text>
+        </TouchableOpacity>
+      </View>
 
       {matches.length === 0 ? (
         <Text style={styles.empty}>No study buddies found yet.</Text>
@@ -81,7 +117,10 @@ export default function BuddiesScreen() {
               {buddy.studyStyle?.communicationStyle ?? "Study style not set"}
             </Text>
 
-            <TouchableOpacity style={styles.button}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => handleConnect(buddy)}
+            >
               <Text style={styles.buttonText}>Connect</Text>
             </TouchableOpacity>
           </View>
@@ -96,7 +135,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 20,
   },
   center: {
     flex: 1,
@@ -155,6 +194,24 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: "#FFFFFF",
+    fontWeight: "bold",
+  },
+  quickActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 20,
+  },
+
+  actionButton: {
+    flex: 1,
+    backgroundColor: "#F3E8FF",
+    padding: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
+  actionText: {
+    color: "#8B5CF6",
     fontWeight: "bold",
   },
 });
