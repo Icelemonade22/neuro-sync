@@ -1,25 +1,27 @@
 import { db } from "@/config/firebase";
 import {
-    addDoc,
-    collection,
-    doc,
-    getDocs,
-    limit,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
-    updateDoc,
-    where,
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 
 export async function createRoomSession(
   roomId: string,
   participants: string[],
+  hostId: string,
 ) {
   const ref = await addDoc(collection(db, "roomSessions"), {
     roomId,
     participants,
+    hostId,
     durationMinutes: 25,
     secondsLeft: 25 * 60,
     isRunning: false,
@@ -73,5 +75,17 @@ export async function completeRoomSession(sessionId: string) {
     isRunning: false,
     completed: true,
     endedAt: serverTimestamp(),
+  });
+}
+
+export async function updateParticipantPresence(
+  sessionId: string,
+  uid: string,
+  data: any,
+) {
+  const ref = doc(db, "roomSessions", sessionId);
+
+  await updateDoc(ref, {
+    [`presence.${uid}`]: data,
   });
 }

@@ -1,13 +1,35 @@
+import AchievementModal from "@/components/achievementModal";
 import { auth, db } from "@/config/firebase";
+import { playSound, stopSound } from "@/src/services/audioService";
+import {
+  awardUserXP,
+  unlockBadge,
+  updateStudyStreak,
+} from "@/src/services/gamificationService";
 import { router } from "expo-router";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { Alert, StyleSheet, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Button, Text } from "react-native-paper";
 
+const SESSION_DURATION = 30;
+
 export default function SessionScreen() {
-  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
+  const [secondsLeft, setSecondsLeft] = useState(SESSION_DURATION);
   const [isRunning, setIsRunning] = useState(false);
+
+  const [achievementVisible, setAchievementVisible] = useState(false);
+
+  const [achievementData, setAchievementData] = useState({
+    title: "",
+    xp: 0,
+  });
 
   useEffect(() => {
     if (!isRunning || secondsLeft <= 0) return;
@@ -20,11 +42,12 @@ export default function SessionScreen() {
   }, [isRunning, secondsLeft]);
 
   useEffect(() => {
-    if (secondsLeft === 0) {
+    if (secondsLeft === 0 && isRunning) {
       setIsRunning(false);
       completeSession();
+      setSecondsLeft(SESSION_DURATION);
     }
-  }, [secondsLeft]);
+  }, [secondsLeft, isRunning]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -49,21 +72,30 @@ export default function SessionScreen() {
       createdAt: serverTimestamp(),
     });
 
-    Alert.alert("Session Completed 🎉", "Great job staying focused!", [
-      {
-        text: "Back to Dashboard",
-        onPress: () => router.replace("/(tabs)"),
-      },
-    ]);
+    await awardUserXP(user.uid, 20);
+    await updateStudyStreak(user.uid);
+
+    const unlocked = await unlockBadge(user.uid, "First Focus Session");
+
+    setAchievementData({
+      title: unlocked ? "First Focus Session" : "Focus Session Completed",
+      xp: 20,
+    });
+
+    setAchievementVisible(true);
   };
 
   const resetSession = () => {
     setIsRunning(false);
-    setSecondsLeft(25 * 60);
+    setSecondsLeft(SESSION_DURATION);
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
       <Text style={styles.title}>Focus Session</Text>
       <Text style={styles.subtitle}>Pomodoro Mode</Text>
 
@@ -86,47 +118,163 @@ export default function SessionScreen() {
       <Button mode="text" onPress={() => router.back()}>
         Back
       </Button>
-    </View>
+
+      <Text style={styles.musicTitle}>Focus Music 🎵</Text>
+
+      <View style={styles.musicGrid}>
+        <TouchableOpacity
+          style={styles.musicCard}
+          onPress={() => playSound(require("@/assets/audio/rain.mp3"))}
+        >
+          <Text style={styles.musicEmoji}>🌧️</Text>
+          <Text style={styles.musicName}>Rain</Text>
+          <Text style={styles.musicDesc}>Calm focus</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.musicCard}
+          onPress={() => playSound(require("@/assets/audio/cafe.mp3"))}
+        >
+          <Text style={styles.musicEmoji}>☕</Text>
+          <Text style={styles.musicName}>Cafe</Text>
+          <Text style={styles.musicDesc}>Soft ambience</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.musicCard}
+          onPress={() => playSound(require("@/assets/audio/ocean.mp3"))}
+        >
+          <Text style={styles.musicEmoji}>🌊</Text>
+          <Text style={styles.musicName}>Ocean</Text>
+          <Text style={styles.musicDesc}>Relaxing waves</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.musicCard}
+          onPress={() => playSound(require("@/assets/audio/lofi.mp3"))}
+        >
+          <Text style={styles.musicEmoji}>🎹</Text>
+          <Text style={styles.musicName}>Lo-fi</Text>
+          <Text style={styles.musicDesc}>Study beats</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Button
+        mode="contained"
+        style={styles.stopMusicButton}
+        onPress={stopSound}
+      >
+        Stop Music
+      </Button>
+
+      <AchievementModal
+        visible={achievementVisible}
+        title={achievementData.title}
+        xp={achievementData.xp}
+        onClose={() => {
+          setAchievementVisible(false);
+          router.replace("/(tabs)");
+        }}
+      />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 24,
-    justifyContent: "center",
     backgroundColor: "#FFFFFF",
   },
+
+  content: {
+    padding: 24,
+    paddingTop: 30,
+    paddingBottom: 120,
+  },
+
   title: {
     fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
   },
+
   subtitle: {
     textAlign: "center",
     color: "#888",
     marginTop: 8,
-    marginBottom: 40,
+    marginBottom: 30,
   },
+
   timerCircle: {
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    borderWidth: 10,
+    width: 210,
+    height: 210,
+    borderRadius: 105,
+    borderWidth: 9,
     borderColor: "#8B5CF6",
     alignSelf: "center",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 28,
+    marginTop: 10,
   },
+
   timerText: {
     fontSize: 48,
     fontWeight: "bold",
     color: "#8B5CF6",
   },
+
   startButton: {
     borderRadius: 24,
     paddingVertical: 6,
     backgroundColor: "#8B5CF6",
+    marginBottom: 10,
+  },
+
+  musicTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginTop: 26,
+    marginBottom: 16,
+  },
+
+  musicGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 14,
+  },
+
+  musicCard: {
+    width: "47%",
+    backgroundColor: "#F8F5FF",
+    borderRadius: 18,
+    padding: 18,
+    minHeight: 130,
+    justifyContent: "center",
+  },
+
+  musicEmoji: {
+    fontSize: 30,
+    marginBottom: 10,
+  },
+
+  musicName: {
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#8B5CF6",
+  },
+
+  musicDesc: {
+    color: "#777",
+    marginTop: 6,
+    fontSize: 12,
+  },
+
+  stopMusicButton: {
+    marginTop: 20,
+    backgroundColor: "#8B5CF6",
+    borderRadius: 24,
+    paddingVertical: 6,
+    marginBottom: 40,
   },
 });

@@ -1,6 +1,6 @@
 import { auth, db } from "@/config/firebase";
 import { router, useLocalSearchParams } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { Button, Text } from "react-native-paper";
@@ -9,6 +9,8 @@ export default function RoomDetailsScreen() {
   const { id } = useLocalSearchParams();
   const [room, setRoom] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [buddyStatus, setBuddyStatus] = useState<any>(null);
+  const [buddyId, setBuddyId] = useState<string | null>(null);
 
   useEffect(() => {
     loadRoom();
@@ -21,11 +23,46 @@ export default function RoomDetailsScreen() {
     const snap = await getDoc(roomRef);
 
     if (snap.exists()) {
-      setRoom({ id: snap.id, ...snap.data() });
+      const roomData: any = {
+        id: snap.id,
+        ...snap.data(),
+      };
+
+      setRoom(roomData);
+
+      const foundBuddyId = roomData.participants?.find(
+        (participantId: string) => participantId !== auth.currentUser?.uid,
+      );
+
+      setBuddyId(foundBuddyId ?? null);
+
+      const buddyId = roomData.participants?.find(
+        (participantId: string) => participantId !== auth.currentUser?.uid,
+      );
+
+      if (buddyId) {
+        const buddySnap = await getDoc(doc(db, "users", buddyId));
+
+        if (buddySnap.exists()) {
+          setBuddyStatus(buddySnap.data());
+        }
+      }
     }
 
     setLoading(false);
   };
+
+  useEffect(() => {
+    if (!buddyId) return;
+
+    const unsubscribe = onSnapshot(doc(db, "users", buddyId), (snap) => {
+      if (snap.exists()) {
+        setBuddyStatus(snap.data());
+      }
+    });
+
+    return unsubscribe;
+  }, [buddyId]);
 
   if (loading) {
     return (
@@ -50,6 +87,21 @@ export default function RoomDetailsScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Study Room 📚</Text>
+
+      <View style={styles.presenceRow}>
+        <View
+          style={[
+            styles.presenceDot,
+            {
+              backgroundColor: buddyStatus?.online ? "#22C55E" : "#9CA3AF",
+            },
+          ]}
+        />
+
+        <Text style={styles.presenceText}>
+          {buddyStatus?.online ? "Buddy Online" : "Buddy Offline"}
+        </Text>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.label}>Participants</Text>
@@ -141,5 +193,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#8B5CF6",
     borderRadius: 24,
     paddingVertical: 6,
+  },
+  presenceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  presenceDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+
+  presenceText: {
+    color: "#6B7280",
+    fontWeight: "600",
   },
 });

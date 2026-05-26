@@ -8,7 +8,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
-  where
+  where,
 } from "firebase/firestore";
 
 export async function sendBuddyRequest({
@@ -24,6 +24,21 @@ export async function sendBuddyRequest({
   toName: string;
   compatibility: number;
 }) {
+  const existingQuery = query(
+    collection(db, "buddyRequests"),
+    where("fromUserId", "==", fromUserId),
+    where("toUserId", "==", toUserId),
+  );
+
+  const existingSnap = await getDocs(existingQuery);
+
+  if (!existingSnap.empty) {
+    return {
+      success: false,
+      message: "Request already exists.",
+    };
+  }
+
   await addDoc(collection(db, "buddyRequests"), {
     fromUserId,
     fromName,
@@ -33,6 +48,11 @@ export async function sendBuddyRequest({
     status: "pending",
     createdAt: serverTimestamp(),
   });
+
+  return {
+    success: true,
+    message: "Request sent.",
+  };
 }
 
 export async function getIncomingBuddyRequests(uid: string) {
@@ -63,6 +83,21 @@ export async function updateBuddyRequestStatus(
 }
 
 export async function createStudyRoomFromRequest(request: any) {
+  const existingRoomQuery = query(
+    collection(db, "studyRooms"),
+    where("requestId", "==", request.id),
+  );
+
+  const existingRoomSnap = await getDocs(existingRoomQuery);
+
+  if (!existingRoomSnap.empty) {
+    return {
+      success: false,
+      roomId: existingRoomSnap.docs[0].id,
+      message: "Study room already exists.",
+    };
+  }
+
   const roomRef = doc(collection(db, "studyRooms"));
 
   await setDoc(roomRef, {
@@ -74,5 +109,23 @@ export async function createStudyRoomFromRequest(request: any) {
     createdAt: serverTimestamp(),
   });
 
-  return roomRef.id;
+  return {
+    success: true,
+    roomId: roomRef.id,
+    message: "Study room created.",
+  };
+}
+
+export async function getOutgoingBuddyRequests(uid: string) {
+  const q = query(
+    collection(db, "buddyRequests"),
+    where("fromUserId", "==", uid),
+  );
+
+  const snap = await getDocs(q);
+
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+  }));
 }

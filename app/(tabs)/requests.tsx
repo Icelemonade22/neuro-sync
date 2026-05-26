@@ -1,16 +1,16 @@
 import { auth } from "@/config/firebase";
 import {
-    createStudyRoomFromRequest,
-    getIncomingBuddyRequests,
-    updateBuddyRequestStatus,
+  createStudyRoomFromRequest,
+  getIncomingBuddyRequests,
+  updateBuddyRequestStatus,
 } from "@/src/services/buddyRequestService";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
 import { Button, Text } from "react-native-paper";
 
@@ -38,8 +38,14 @@ export default function RequestsScreen() {
     await updateBuddyRequestStatus(request.id, status);
 
     if (status === "accepted") {
-      await createStudyRoomFromRequest(request);
-      Alert.alert("Request Accepted", "A study room has been created.");
+      const result = await createStudyRoomFromRequest(request);
+
+      Alert.alert(
+        "Request Accepted",
+        result.success
+          ? "A study room has been created."
+          : "A study room already exists.",
+      );
     } else {
       Alert.alert("Request Rejected");
     }

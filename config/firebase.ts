@@ -28,19 +28,25 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAwztpukV5Efwuz3z1u9j4fgRxXaXzX6KM",
   authDomain: "fir-neurosync.firebaseapp.com",
   projectId: "fir-neurosync",
   storageBucket: "fir-neurosync.firebasestorage.app",
+  //storageBucket: "fir-neurosync.appspot.com",
   messagingSenderId: "906464616373",
   appId: "1:906464616373:web:245ceeb551b3edc32883fc",
 };
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
+const storage = getStorage(app);
+
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-
+export { storage };
 export default app;
+export { app };
+

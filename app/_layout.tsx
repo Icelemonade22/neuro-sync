@@ -1,40 +1,29 @@
-// import { Stack, useRouter } from "expo-router";
-// import { useEffect } from "react";
-
-// function RouteGuard({ children }: { children: React.ReactNode }) {
-//   const router = useRouter();
-//   const isAuth = false;
-
-//   useEffect(() => {
-//     if (!isAuth) {
-//       router.replace("/auth");
-//     }
-//   });
-//   return <>{children}</>;
-// }
-
-// export default function RootLayout() {
-//   return (
-//     <RouteGuard>
-//       <Stack>
-//         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-//       </Stack>
-//     </RouteGuard>
-//   );
-// }
-
 import { AuthProvider } from "@/config/auth-context";
 import { Stack } from "expo-router";
+import { PaperProvider } from "react-native-paper";
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <Stack>
-        {/* <Stack.Screen name="index" options={{ headerShown: false }} /> */}
-        <Stack.Screen name="auth" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
-    </AuthProvider>
+    <PaperProvider>
+      <AuthProvider>
+        <Stack>
+          <Stack.Screen name="auth" options={{ headerShown: false }} />
+          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen name="editProfile" options={{ headerShown: false }} />
+          <Stack.Screen name="leaderboard" options={{ headerShown: false }} />
+          <Stack.Screen name="assistant" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="uploadNote" options={{ headerShown: false }} />
+
+          <Stack.Screen name="room/[id]" options={{ title: "Study Room" }} />
+          <Stack.Screen name="quiz" options={{ headerShown: false }} />
+
+          <Stack.Screen
+            name="room/[id]/session"
+            options={{ title: "Shared Session" }}
+          />
+        </Stack>
+      </AuthProvider>
+    </PaperProvider>
   );
 }

@@ -52,8 +52,9 @@ import {
   signOut,
   User,
 } from "firebase/auth";
+import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
 
 type AuthContextType = {
   user: User | null;
@@ -71,8 +72,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+
+      if (currentUser) {
+        await updateDoc(doc(db, "users", currentUser.uid), {
+          online: true,
+          lastActive: serverTimestamp(),
+        });
+      }
+
       setLoading(false);
     });
 
@@ -100,9 +109,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    if (auth.currentUser) {
+      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+        online: false,
+        lastActive: serverTimestamp(),
+      });
+    }
+
     await signOut(auth);
   };
-
   const resetPassword = async (email: string) => {
     try {
       await sendPasswordResetEmail(auth, email);

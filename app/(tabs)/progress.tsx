@@ -1,28 +1,52 @@
 import { auth } from "@/config/firebase";
 import { getUserSessions } from "@/src/services/getUserSessions";
 import { calculateAnalytics } from "@/src/utils/calculateAnalytics";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import { calculateWeeklyActivity } from "@/src/utils/calculateWeeklyActivity";
+import { generateAnalyticsInsights } from "@/src/utils/generateAnalyticsInsights";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import { BarChart } from "react-native-chart-kit";
 import { Text } from "react-native-paper";
+
+const screenWidth = Dimensions.get("window").width;
 
 export default function ProgressScreen() {
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<any>(null);
+  const [weeklyData, setWeeklyData] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
+  const [insights, setInsights] = useState<any>(null);
 
-  useEffect(() => {
-    loadAnalytics();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadAnalytics();
+    }, []),
+  );
 
   const loadAnalytics = async () => {
+    setLoading(true);
+
     const user = auth.currentUser;
 
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     const sessions = await getUserSessions(user.uid);
-
     const result = calculateAnalytics(sessions);
+    const weekly = calculateWeeklyActivity(sessions);
+    const smartInsights = generateAnalyticsInsights(sessions);
+    setInsights(smartInsights);
 
     setAnalytics(result);
+    setWeeklyData(weekly);
     setLoading(false);
   };
 
@@ -65,6 +89,73 @@ export default function ProgressScreen() {
           value={analytics.totalSessions >= 5 ? "Excellent" : "Improving"}
           subtitle="Weekly habit"
         />
+      </View>
+
+      <Text style={styles.sectionTitle}>Weekly Study Activity</Text>
+
+      <BarChart
+        data={{
+          labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+          datasets: [
+            {
+              data: weeklyData,
+            },
+          ],
+        }}
+        width={screenWidth - 48}
+        height={220}
+        yAxisLabel=""
+        yAxisSuffix="m"
+        chartConfig={{
+          backgroundGradientFrom: "#FFFFFF",
+          backgroundGradientTo: "#FFFFFF",
+          decimalPlaces: 0,
+          color: () => "#8B5CF6",
+          labelColor: () => "#777",
+          propsForBackgroundLines: {
+            strokeDasharray: "",
+            stroke: "#EEEEEE",
+          },
+        }}
+        style={styles.chart}
+      />
+
+      {insights && (
+        <>
+          <Text style={styles.sectionTitle}>Smart Insights 🧠</Text>
+
+          <View style={styles.insightCard}>
+            <Text style={styles.insightTitle}>📈 Weekly Study Time</Text>
+            <Text style={styles.insightText}>
+              You studied {Math.round(insights.totalMinutes / 60)} hours this
+              week.
+            </Text>
+          </View>
+
+          <View style={styles.insightCard}>
+            <Text style={styles.insightTitle}>🔥 Best Study Day</Text>
+            <Text style={styles.insightText}>
+              Your most productive day is {insights.bestStudyDay}.
+            </Text>
+          </View>
+
+          <View style={styles.insightCard}>
+            <Text style={styles.insightTitle}>🧠 Consistency</Text>
+            <Text style={styles.insightText}>
+              Your weekly consistency is {insights.consistency}.
+            </Text>
+          </View>
+        </>
+      )}
+
+      <Text style={styles.sectionTitle}>Recent Achievements</Text>
+
+      <View style={styles.achievementCard}>
+        <Text style={styles.achievementText}>🏅 First Focus Session</Text>
+      </View>
+
+      <View style={styles.achievementCard}>
+        <Text style={styles.achievementText}>🤝 Collaborative Learner</Text>
       </View>
 
       <View style={styles.section}>
@@ -158,19 +249,37 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   insightCard: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#EEEEEE",
-    borderRadius: 18,
-    padding: 20,
+    backgroundColor: "#F8F5FF",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
   },
+
   insightTitle: {
     fontWeight: "bold",
+    color: "#8B5CF6",
+    marginBottom: 6,
     fontSize: 16,
-    marginBottom: 8,
   },
+
   insightText: {
-    color: "#666",
-    lineHeight: 22,
+    color: "#555",
+    lineHeight: 20,
+  },
+  chart: {
+    marginVertical: 16,
+    borderRadius: 16,
+  },
+
+  achievementCard: {
+    backgroundColor: "#F8F5FF",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+
+  achievementText: {
+    fontWeight: "bold",
+    color: "#333",
   },
 });

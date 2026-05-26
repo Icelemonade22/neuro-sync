@@ -1,7 +1,11 @@
 import { auth } from "@/config/firebase";
 import { getUserProfile } from "@/src/services/getUserProfile";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { getUserSessions } from "@/src/services/getUserSessions";
+import { calculateTodayMinutes } from "@/src/utils/calculateTodayMinutes";
+import { detectBurnout } from "@/src/utils/detectBurnout";
+import { generateStudyRecommendation } from "@/src/utils/generateStudyRecommendation";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -14,23 +18,40 @@ import { Text } from "react-native-paper";
 export default function DashboardScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [todayMinutes, setTodayMinutes] = useState(0);
+  const [recommendation, setRecommendation] = useState<any>(null);
+  const [burnoutWarning, setBurnoutWarning] = useState<any>(null);
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      const user = auth.currentUser;
+  const loadProfile = async () => {
+    const user = auth.currentUser;
 
-      if (!user) {
-        router.replace("/auth");
-        return;
-      }
+    if (!user) {
+      router.replace("/auth");
+      return;
+    }
 
-      const data = await getUserProfile(user.uid);
-      setProfile(data);
-      setLoading(false);
-    };
+    const data = await getUserProfile(user.uid);
+    setProfile(data);
 
-    loadProfile();
-  }, []);
+    const sessions = await getUserSessions(user.uid);
+    const minutesToday = calculateTodayMinutes(sessions);
+
+    setTodayMinutes(minutesToday);
+
+    const burnout = detectBurnout(sessions);
+    setBurnoutWarning(burnout);
+
+    const smartRecommendation = generateStudyRecommendation(data, sessions);
+    setRecommendation(smartRecommendation);
+
+    setLoading(false);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, []),
+  );
 
   if (loading) {
     return (
@@ -48,12 +69,47 @@ export default function DashboardScreen() {
   const dailyGoal = profile?.studyGoals?.dailyStudyMinutes ?? 120;
   const subject = profile?.subject ?? "Study Session";
 
+  const xp = profile?.xp ?? 0;
+  const level = profile?.level ?? 1;
+  const badges = profile?.badges ?? [];
+
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       <View style={styles.container}>
         <Text style={styles.greeting}>Hi {firstName} 👋</Text>
 
-        <Text style={styles.streak}>🔥 5-day streak</Text>
+        <Text style={styles.levelText}>
+          Level {level} • {xp} XP
+        </Text>
+
+        {badges.length > 0 && (
+          <Text style={styles.badgeText}>🏅 {badges[0]}</Text>
+        )}
+
+        <Text style={styles.streak}>🔥 {profile?.streak ?? 0}-day streak</Text>
+
+        <Text style={styles.smallText}>
+          Best streak: {profile?.longestStreak ?? 0} days
+        </Text>
+
+        {recommendation && (
+          <View style={styles.recommendationCard}>
+            <Text style={styles.recommendationTitle}>
+              {recommendation.title}
+            </Text>
+            <Text style={styles.recommendationMessage}>
+              {recommendation.message}
+            </Text>
+          </View>
+        )}
+
+        {burnoutWarning && (
+          <View style={styles.burnoutCard}>
+            <Text style={styles.burnoutTitle}>{burnoutWarning.title}</Text>
+
+            <Text style={styles.burnoutMessage}>{burnoutWarning.message}</Text>
+          </View>
+        )}
 
         <View style={styles.card}>
           <View style={styles.row}>
@@ -91,10 +147,19 @@ export default function DashboardScreen() {
           </Text>
 
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: "65%" }]} />
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${Math.min((todayMinutes / dailyGoal) * 100, 100)}%`,
+                },
+              ]}
+            />
           </View>
 
-          <Text style={styles.progressText}>78 / {dailyGoal} min</Text>
+          <Text style={styles.progressText}>
+            {todayMinutes} / {dailyGoal} min
+          </Text>
         </View>
 
         <Text style={styles.sectionTitle}>Your Study Buddy</Text>
@@ -273,5 +338,52 @@ const styles = StyleSheet.create({
     color: "#22C55E",
     fontSize: 10,
     marginTop: 4,
+  },
+  levelText: {
+    color: "#8B5CF6",
+    fontWeight: "bold",
+    marginBottom: 6,
+  },
+
+  badgeText: {
+    color: "#555",
+    marginBottom: 12,
+  },
+  recommendationCard: {
+    backgroundColor: "#F8F5FF",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 20,
+  },
+
+  recommendationTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#8B5CF6",
+  },
+
+  recommendationMessage: {
+    marginTop: 6,
+    color: "#666",
+    lineHeight: 20,
+  },
+
+  burnoutCard: {
+    backgroundColor: "#FEF3C7",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 20,
+  },
+
+  burnoutTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#B45309",
+  },
+
+  burnoutMessage: {
+    marginTop: 6,
+    color: "#92400E",
+    lineHeight: 20,
   },
 });

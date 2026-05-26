@@ -1,5 +1,8 @@
 import { auth } from "@/config/firebase";
-import { sendBuddyRequest } from "@/src/services/buddyRequestService";
+import {
+  getOutgoingBuddyRequests,
+  sendBuddyRequest,
+} from "@/src/services/buddyRequestService";
 import { getStudyBuddies } from "@/src/services/getStudyBuddies";
 import { getUserProfile } from "@/src/services/getUserProfile";
 import { calculateCompatibility } from "@/src/utils/calculateCompatibility";
@@ -18,6 +21,9 @@ import { Text } from "react-native-paper";
 export default function BuddiesScreen() {
   const [loading, setLoading] = useState(true);
   const [matches, setMatches] = useState<any[]>([]);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [sentRequestIds, setSentRequestIds] = useState<string[]>([]);
+  const [connectedBuddyIds, setConnectedBuddyIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadMatches();
@@ -26,6 +32,19 @@ export default function BuddiesScreen() {
   const loadMatches = async () => {
     const user = auth.currentUser;
     if (!user) return;
+
+    const outgoingRequests = await getOutgoingBuddyRequests(user.uid);
+
+    const pendingIds = outgoingRequests
+      .filter((request: any) => request.status === "pending")
+      .map((request: any) => request.toUserId);
+
+    const acceptedIds = outgoingRequests
+      .filter((request: any) => request.status === "accepted")
+      .map((request: any) => request.toUserId);
+
+    setSentRequestIds(pendingIds);
+    setConnectedBuddyIds(acceptedIds);
 
     const currentProfile = await getUserProfile(user.uid);
     const users = await getStudyBuddies(user.uid);
@@ -45,17 +64,34 @@ export default function BuddiesScreen() {
     const user = auth.currentUser;
     if (!user) return;
 
-    const currentProfile = await getUserProfile(user.uid);
+    try {
+      setConnectingId(buddy.id);
 
-    await sendBuddyRequest({
-      fromUserId: user.uid,
-      fromName: currentProfile?.fullName ?? "Student",
-      toUserId: buddy.uid,
-      toName: buddy.fullName ?? "Student",
-      compatibility: buddy.compatibility,
-    });
+      const currentProfile = await getUserProfile(user.uid);
 
-    Alert.alert("Request Sent", `Buddy request sent to ${buddy.fullName}.`);
+      const result = await sendBuddyRequest({
+        fromUserId: user.uid,
+        fromName: currentProfile?.fullName ?? "Student",
+        toUserId: buddy.uid,
+        toName: buddy.fullName ?? "Student",
+        compatibility: buddy.compatibility,
+      });
+
+      if (!result.success) {
+        Alert.alert("Already Sent", result.message);
+        setSentRequestIds((prev) => [...prev, buddy.uid]);
+        return;
+      }
+
+      setSentRequestIds((prev) => [...prev, buddy.uid]);
+
+      Alert.alert("Request Sent", `Buddy request sent to ${buddy.fullName}.`);
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Error", "Failed to send buddy request.");
+    } finally {
+      setConnectingId(null);
+    }
   };
 
   if (loading) {
@@ -95,36 +131,81 @@ export default function BuddiesScreen() {
       {matches.length === 0 ? (
         <Text style={styles.empty}>No study buddies found yet.</Text>
       ) : (
-        matches.map((buddy) => (
-          <View key={buddy.id} style={styles.card}>
-            <View style={styles.row}>
-              <View>
-                <Text style={styles.name}>{buddy.fullName ?? "Student"}</Text>
-                <Text style={styles.subject}>
-                  {buddy.subject ?? "Unknown subject"}
-                </Text>
+        matches.map((buddy) => {
+          const alreadySent = sentRequestIds.includes(buddy.uid);
+          const connected = connectedBuddyIds.includes(buddy.uid);
+
+          return (
+            <View key={buddy.id} style={styles.card}>
+              <View style={styles.row}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {(buddy.fullName ?? "S").charAt(0)}
+                  </Text>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>{buddy.fullName ?? "Student"}</Text>
+                  <Text style={styles.subject}>
+                    {buddy.subject ?? "Unknown subject"}
+                  </Text>
+                </View>
+
+                <Text style={styles.score}>{buddy.compatibility}%</Text>
               </View>
 
-              <Text style={styles.score}>{buddy.compatibility}%</Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>🌟 Best Match</Text>
+              </View>
+
+              <View style={styles.compatibilityBar}>
+                <View
+                  style={[
+                    styles.compatibilityFill,
+                    { width: `${buddy.compatibility}%` },
+                  ]}
+                />
+              </View>
+
+              <Text style={styles.matchReason}>
+                Matched by subject, focus level, accountability, and study time.
+              </Text>
+
+              <Text style={styles.detail}>
+                {buddy.studyPreferences?.sessionType ?? "Pomodoro"} •{" "}
+                {buddy.availability?.preferredTime ?? "Anytime"}
+              </Text>
+
+              <Text style={styles.detail}>
+                {buddy.studyStyle?.communicationStyle ?? "Study style not set"}
+              </Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  (connectingId === buddy.id || alreadySent || connected) && {
+                    opacity: 0.6,
+                  },
+                  connected && {
+                    backgroundColor: "#22C55E",
+                  },
+                ]}
+                disabled={connectingId === buddy.id || alreadySent || connected}
+                onPress={() => handleConnect(buddy)}
+              >
+                <Text style={styles.buttonText}>
+                  {connected
+                    ? "Connected ✅"
+                    : alreadySent
+                      ? "Request Sent"
+                      : connectingId === buddy.id
+                        ? "Sending..."
+                        : "Connect"}
+                </Text>
+              </TouchableOpacity>
             </View>
-
-            <Text style={styles.detail}>
-              {buddy.studyPreferences?.sessionType ?? "Pomodoro"} •{" "}
-              {buddy.availability?.preferredTime ?? "Anytime"}
-            </Text>
-
-            <Text style={styles.detail}>
-              {buddy.studyStyle?.communicationStyle ?? "Study style not set"}
-            </Text>
-
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => handleConnect(buddy)}
-            >
-              <Text style={styles.buttonText}>Connect</Text>
-            </TouchableOpacity>
-          </View>
-        ))
+          );
+        })
       )}
     </ScrollView>
   );
@@ -213,5 +294,57 @@ const styles = StyleSheet.create({
   actionText: {
     color: "#8B5CF6",
     fontWeight: "bold",
+  },
+
+  compatibilityBar: {
+    height: 8,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 10,
+    marginTop: 14,
+    overflow: "hidden",
+  },
+
+  compatibilityFill: {
+    height: 8,
+    backgroundColor: "#8B5CF6",
+    borderRadius: 10,
+  },
+
+  matchReason: {
+    color: "#777",
+    fontSize: 12,
+    marginTop: 10,
+    lineHeight: 18,
+  },
+
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#8B5CF6",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+
+  avatarText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+
+  badge: {
+    backgroundColor: "#F3E8FF",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    alignSelf: "flex-start",
+    marginTop: 14,
+  },
+
+  badgeText: {
+    color: "#8B5CF6",
+    fontWeight: "bold",
+    fontSize: 12,
   },
 });

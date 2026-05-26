@@ -61,6 +61,19 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color, focused }) => {
+            return focused ? (
+              <Ionicons name="person-circle-outline" size={24} color={color} />
+            ) : (
+              <Ionicons name="person-circle-outline" size={24} color="black" />
+            );
+          },
+        }}
+      />
+      <Tabs.Screen
         name="requests"
         options={{
           href: null,
@@ -69,6 +82,13 @@ export default function TabsLayout() {
 
       <Tabs.Screen
         name="rooms"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
+        name="notes"
         options={{
           href: null,
         }}
