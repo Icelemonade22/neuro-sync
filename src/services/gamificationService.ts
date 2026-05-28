@@ -25,7 +25,7 @@ export async function updateStudyStreak(uid: string) {
   const userRef = doc(db, "users", uid);
   const userSnap = await getDoc(userRef);
 
-  if (!userSnap.exists()) return;
+  if (!userSnap.exists()) return 1;
 
   const userData = userSnap.data();
 
@@ -39,7 +39,7 @@ export async function updateStudyStreak(uid: string) {
   let newStreak = currentStreak;
 
   if (lastStudyDate === today) {
-    return;
+    return currentStreak || 1;
   }
 
   if (lastStudyDate === yesterday) {
@@ -54,6 +54,8 @@ export async function updateStudyStreak(uid: string) {
     lastStudyDate: today,
     updatedAt: serverTimestamp(),
   });
+
+  return newStreak;
 }
 
 export async function awardUserXP(uid: string, xpAmount: number) {
@@ -90,4 +92,12 @@ export async function unlockBadge(uid: string, badgeName: string) {
   });
 
   return true;
+}
+
+export function getStreakMultiplier(streak: number) {
+  if (streak >= 14) return 2;
+  if (streak >= 7) return 1.5;
+  if (streak >= 3) return 1.2;
+
+  return 1;
 }

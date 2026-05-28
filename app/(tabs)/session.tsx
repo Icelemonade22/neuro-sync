@@ -1,8 +1,10 @@
 import AchievementModal from "@/components/achievementModal";
 import { auth, db } from "@/config/firebase";
 import { playSound, stopSound } from "@/src/services/audioService";
+import { completeMission } from "@/src/services/dailyMissionService";
 import {
   awardUserXP,
+  getStreakMultiplier,
   unlockBadge,
   updateStudyStreak,
 } from "@/src/services/gamificationService";
@@ -25,6 +27,7 @@ export default function SessionScreen() {
   const [isRunning, setIsRunning] = useState(false);
 
   const [achievementVisible, setAchievementVisible] = useState(false);
+  const [savingSession, setSavingSession] = useState(false);
 
   const [achievementData, setAchievementData] = useState({
     title: "",
@@ -57,32 +60,51 @@ export default function SessionScreen() {
   };
 
   const completeSession = async () => {
+    if (savingSession) return;
+
+    setSavingSession(true);
+
     const user = auth.currentUser;
 
     if (!user) {
       Alert.alert("Error", "No user found.");
+      setSavingSession(false);
       return;
     }
 
-    await addDoc(collection(db, "studySessions"), {
-      userId: user.uid,
-      sessionType: "Pomodoro",
-      durationMinutes: 25,
-      completed: true,
-      createdAt: serverTimestamp(),
-    });
+    try {
+      await addDoc(collection(db, "studySessions"), {
+        userId: user.uid,
+        sessionType: "Pomodoro",
+        durationMinutes: 25,
+        completed: true,
+        createdAt: serverTimestamp(),
+      });
 
-    await awardUserXP(user.uid, 20);
-    await updateStudyStreak(user.uid);
+      const streak = await updateStudyStreak(user.uid);
 
-    const unlocked = await unlockBadge(user.uid, "First Focus Session");
+      const multiplier = getStreakMultiplier(streak);
 
-    setAchievementData({
-      title: unlocked ? "First Focus Session" : "Focus Session Completed",
-      xp: 20,
-    });
+      const earnedXp = Math.round(20 * multiplier);
 
-    setAchievementVisible(true);
+      await awardUserXP(user.uid, earnedXp);
+
+      await completeMission("study");
+
+      const unlocked = await unlockBadge(user.uid, "First Focus Session");
+
+      setAchievementData({
+        title: unlocked ? "First Focus Session" : "Focus Session Completed",
+        xp: earnedXp,
+      });
+
+      setAchievementVisible(true);
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Error", "Failed to save session.");
+    } finally {
+      setSavingSession(false);
+    }
   };
 
   const resetSession = () => {
@@ -107,8 +129,9 @@ export default function SessionScreen() {
         mode="contained"
         style={styles.startButton}
         onPress={() => setIsRunning((prev) => !prev)}
+        disabled={savingSession}
       >
-        {isRunning ? "Pause" : "Start"}
+        {savingSession ? "Saving..." : isRunning ? "Pause" : "Start"}
       </Button>
 
       <Button mode="text" onPress={resetSession}>

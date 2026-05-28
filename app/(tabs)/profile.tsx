@@ -64,6 +64,20 @@ export default function ProfileScreen() {
     );
   }
 
+  const getNextLevelXp = (level: number) => {
+    if (level === 1) return 100;
+    if (level === 2) return 250;
+    if (level === 3) return 500;
+    if (level === 4) return 1000;
+
+    return 1500;
+  };
+
+  const xp = profile?.xp ?? 0;
+  const level = profile?.level ?? 1;
+  const nextLevelXp = getNextLevelXp(level);
+  const progressPercent = Math.min((xp / nextLevelXp) * 100, 100);
+
   return (
     <ScrollView
       style={styles.container}
@@ -132,6 +146,15 @@ export default function ProfileScreen() {
         <Text style={styles.levelTitle}>Level {profile?.level ?? 1}</Text>
 
         <Text style={styles.xpText}>{profile?.xp ?? 0} XP</Text>
+
+        <View style={styles.xpBar}>
+          <View style={[styles.xpFill, { width: `${progressPercent}%` }]} />
+        </View>
+
+        <Text style={styles.xpProgressText}>
+          {xp} / {nextLevelXp} XP to next level
+        </Text>
+
         <Text style={styles.detail}>
           Current Streak: {profile?.streak ?? 0} days
         </Text>
@@ -170,6 +193,24 @@ export default function ProfileScreen() {
       >
         View Leaderboard
       </Button>
+
+      <Button
+        mode="outlined"
+        style={styles.button}
+        onPress={() => router.push("/dailyMissions")}
+      >
+        Daily Missions
+      </Button>
+
+      {profile?.role === "admin" && (
+        <Button
+          mode="contained"
+          style={styles.button}
+          onPress={() => router.push("/admin" as any)}
+        >
+          Admin Dashboard
+        </Button>
+      )}
 
       <Button
         mode="outlined"
@@ -277,5 +318,25 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 32,
     fontWeight: "bold",
+  },
+  xpBar: {
+    height: 10,
+    backgroundColor: "#EDE9FE",
+    borderRadius: 20,
+    overflow: "hidden",
+    marginTop: 12,
+    marginBottom: 6,
+  },
+
+  xpFill: {
+    height: "100%",
+    backgroundColor: "#8B5CF6",
+    borderRadius: 20,
+  },
+
+  xpProgressText: {
+    color: "#777",
+    fontSize: 12,
+    marginBottom: 12,
   },
 });

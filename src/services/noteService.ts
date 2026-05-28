@@ -8,6 +8,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { completeMission } from "./dailyMissionService";
 
 const uriToBlob = (uri: string): Promise<Blob> => {
   return new Promise((resolve, reject) => {
@@ -32,6 +33,7 @@ export async function uploadNote(
   fileName: string,
   title: string,
   subject: string,
+  content: string,
   uploadedBy: string,
 ) {
   const blob = await uriToBlob(fileUri);
@@ -43,16 +45,20 @@ export async function uploadNote(
   await uploadBytes(storageRef, blob, {
     contentType: "application/pdf",
   });
+
   const fileUrl = await getDownloadURL(storageRef);
 
   await addDoc(collection(db, "notes"), {
     title,
     subject,
+    content,
     fileName,
     fileUrl,
     uploadedBy,
     createdAt: serverTimestamp(),
   });
+
+  await completeMission("note");
 }
 
 export function listenNotes(callback: (notes: any[]) => void) {

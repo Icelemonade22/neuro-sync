@@ -1,6 +1,8 @@
 import { auth } from "@/config/firebase";
 import { getUserProfile } from "@/src/services/getUserProfile";
 import { getUserSessions } from "@/src/services/getUserSessions";
+import { generateSmartRecommendation } from "@/src/services/recommendationService";
+import { getUserActiveRoom } from "@/src/services/roomService";
 import { calculateTodayMinutes } from "@/src/utils/calculateTodayMinutes";
 import { detectBurnout } from "@/src/utils/detectBurnout";
 import { generateStudyRecommendation } from "@/src/utils/generateStudyRecommendation";
@@ -21,6 +23,7 @@ export default function DashboardScreen() {
   const [todayMinutes, setTodayMinutes] = useState(0);
   const [recommendation, setRecommendation] = useState<any>(null);
   const [burnoutWarning, setBurnoutWarning] = useState<any>(null);
+  const [activeRoom, setActiveRoom] = useState<any>(null);
 
   const loadProfile = async () => {
     const user = auth.currentUser;
@@ -43,6 +46,9 @@ export default function DashboardScreen() {
 
     const smartRecommendation = generateStudyRecommendation(data, sessions);
     setRecommendation(smartRecommendation);
+
+    const room = await getUserActiveRoom();
+    setActiveRoom(room);
 
     setLoading(false);
   };
@@ -72,11 +78,18 @@ export default function DashboardScreen() {
   const xp = profile?.xp ?? 0;
   const level = profile?.level ?? 1;
   const badges = profile?.badges ?? [];
+  const smartRecommendation = generateSmartRecommendation(profile);
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       <View style={styles.container}>
         <Text style={styles.greeting}>Hi {firstName} 👋</Text>
+
+        <View style={styles.aiCard}>
+          <Text style={styles.aiTitle}>{smartRecommendation.title}</Text>
+
+          <Text style={styles.aiMessage}>{smartRecommendation.message}</Text>
+        </View>
 
         <Text style={styles.levelText}>
           Level {level} • {xp} XP
@@ -91,17 +104,6 @@ export default function DashboardScreen() {
         <Text style={styles.smallText}>
           Best streak: {profile?.longestStreak ?? 0} days
         </Text>
-
-        {recommendation && (
-          <View style={styles.recommendationCard}>
-            <Text style={styles.recommendationTitle}>
-              {recommendation.title}
-            </Text>
-            <Text style={styles.recommendationMessage}>
-              {recommendation.message}
-            </Text>
-          </View>
-        )}
 
         {burnoutWarning && (
           <View style={styles.burnoutCard}>
@@ -165,15 +167,42 @@ export default function DashboardScreen() {
         <Text style={styles.sectionTitle}>Your Study Buddy</Text>
 
         <View style={styles.card}>
-          <Text style={styles.subject}>No active study buddy</Text>
-          <Text style={styles.smallText}>
-            Find students with similar focus levels and study goals:{" "}
-            {accountabilityLevel}%
-          </Text>
+          {activeRoom ? (
+            <>
+              <Text style={styles.subject}>Active Study Room</Text>
+              <Text style={styles.smallText}>
+                {activeRoom.participantNames?.join(" & ")}
+              </Text>
 
-          <TouchableOpacity style={styles.secondaryButton}>
-            <Text style={styles.secondaryText}>Find Compatible Buddy</Text>
-          </TouchableOpacity>
+              <Text style={styles.onlineText}>
+                {activeRoom.buddy?.online
+                  ? "🟢 Buddy online"
+                  : "⚪ Buddy offline"}
+              </Text>
+
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => router.push(`/room/${activeRoom.id}`)}
+              >
+                <Text style={styles.secondaryText}>Continue Room</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <Text style={styles.subject}>No active study buddy</Text>
+              <Text style={styles.smallText}>
+                Find students with similar focus levels and study goals:{" "}
+                {accountabilityLevel}%
+              </Text>
+
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => router.push("/buddies")}
+              >
+                <Text style={styles.secondaryText}>Find Compatible Buddy</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Your Progress</Text>
@@ -385,5 +414,29 @@ const styles = StyleSheet.create({
     marginTop: 6,
     color: "#92400E",
     lineHeight: 20,
+  },
+  aiCard: {
+    backgroundColor: "#F3E8FF",
+    padding: 20,
+    borderRadius: 24,
+    marginBottom: 20,
+  },
+
+  aiTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#6D28D9",
+    marginBottom: 8,
+  },
+
+  aiMessage: {
+    color: "#555",
+    lineHeight: 22,
+  },
+  onlineText: {
+    color: "#666",
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

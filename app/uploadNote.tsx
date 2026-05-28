@@ -11,6 +11,7 @@ export default function UploadNoteScreen() {
   const [subject, setSubject] = useState("");
   const [file, setFile] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
+  const [content, setContent] = useState("");
 
   const pickFile = async () => {
     const result = await DocumentPicker.getDocumentAsync({
@@ -26,10 +27,10 @@ export default function UploadNoteScreen() {
   const handleUpload = async () => {
     const user = auth.currentUser;
 
-    if (!user || !file || !title || !subject) {
+    if (!user || !file || !title || !subject || !content) {
       Alert.alert(
         "Missing Information",
-        "Please fill all fields and select a PDF.",
+        "Please fill all fields, add note content, and select a PDF.",
       );
       return;
     }
@@ -42,6 +43,7 @@ export default function UploadNoteScreen() {
         file.name,
         title,
         subject,
+        content,
         user.email ?? "Student",
       );
 
@@ -75,6 +77,16 @@ export default function UploadNoteScreen() {
         value={subject}
         onChangeText={setSubject}
         style={styles.input}
+      />
+
+      <TextInput
+        label="Note Content"
+        mode="outlined"
+        value={content}
+        onChangeText={setContent}
+        multiline
+        numberOfLines={8}
+        style={styles.contentInput}
       />
 
       <Button mode="outlined" style={styles.button} onPress={pickFile}>
@@ -121,5 +133,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#8B5CF6",
     borderRadius: 24,
     marginBottom: 14,
+  },
+  contentInput: {
+    marginBottom: 14,
+    minHeight: 160,
+    textAlignVertical: "top",
   },
 });

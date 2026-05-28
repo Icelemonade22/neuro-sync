@@ -67,6 +67,7 @@ export default function NotesScreen() {
                   params: {
                     title: note.title,
                     subject: note.subject,
+                    content: note.content,
                   },
                 })
               }

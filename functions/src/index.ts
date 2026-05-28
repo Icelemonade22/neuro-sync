@@ -66,7 +66,7 @@ export const generateQuizHttp = onRequest(
     cors: true,
   },
   async (req, res) => {
-    const { title, subject } = req.body;
+    const { title, subject, content, difficulty } = req.body;
 
     if (!title || !subject) {
       res.status(400).json({
@@ -87,13 +87,46 @@ Create a short revision quiz based on this study note.
 Note title: ${title}
 Subject: ${subject}
 
-Generate:
-- 5 multiple-choice questions
-- 4 options each
-- correct answer
-- short explanation
+Study Note Content:
+${content || "No note content provided. Use the title and subject only."}
 
-Keep it student-friendly and concise.
+Quiz Difficulty Level:
+${difficulty || "Medium"}
+
+Return ONLY valid JSON.
+Do not include markdown.
+Do not include explanations outside JSON.
+
+JSON format:
+{
+  "questions": [
+    {
+      "question": "Question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "answerIndex": 0,
+      "explanation": "Short explanation"
+    }
+  ]
+}
+
+Difficulty Guidelines:
+
+- Easy:
+Simple definitions, beginner-level concepts,
+direct recall questions.
+
+- Medium:
+Concept understanding, moderate reasoning,
+practical understanding.
+
+- Hard:
+Deep understanding, scenario-based reasoning,
+analytical and critical-thinking questions.
+
+If study note content is provided, questions must be based mainly on that content.
+Generate exactly 5 multiple-choice questions.
+Each question must have exactly 4 options.
+answerIndex must be 0, 1, 2, or 3.
 `;
 
     try {
