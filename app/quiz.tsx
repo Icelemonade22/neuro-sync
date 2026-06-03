@@ -31,6 +31,9 @@ export default function QuizScreen() {
     xp: 0,
   });
 
+  const [modalHeading, setModalHeading] = useState("Quiz Completed!");
+  const [modalEmoji, setModalEmoji] = useState("🧠");
+
   const handleGenerateQuiz = async () => {
     try {
       setLoading(true);
@@ -177,13 +180,20 @@ export default function QuizScreen() {
 
                 const reward = await rewardQuizXp(score);
 
-                await completeMission("quiz");
+                const missionCompleted = await completeMission("quiz");
+
+                setModalHeading(
+                  missionCompleted ? "Mission Completed!" : "Quiz Completed!",
+                );
+
+                setModalEmoji(missionCompleted ? "🎯" : "🧠");
 
                 setAchievementData({
-                  title:
-                    reward?.unlockedBadges?.[0] ??
-                    `Quiz Completed: ${score}/${questions.length}`,
-                  xp: reward?.xpEarned ?? score * 10,
+                  title: missionCompleted
+                    ? "Complete 1 Quiz Mission Completed"
+                    : (reward?.unlockedBadges?.[0] ??
+                      `Quiz Completed: ${score}/${questions.length}`),
+                  xp: missionCompleted ? 20 : (reward?.xpEarned ?? score * 10),
                 });
 
                 setAchievementVisible(true);
@@ -207,6 +217,8 @@ export default function QuizScreen() {
 
       <AchievementModal
         visible={achievementVisible}
+        heading={modalHeading}
+        emoji={modalEmoji}
         title={achievementData.title}
         xp={achievementData.xp}
         onClose={() => setAchievementVisible(false)}

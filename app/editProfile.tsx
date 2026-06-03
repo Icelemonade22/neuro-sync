@@ -5,12 +5,12 @@ import { router } from "expo-router";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Button, Menu, Text, TextInput } from "react-native-paper";
 
@@ -29,6 +29,15 @@ export default function EditProfileScreen() {
   const [studyLevelMenuVisible, setStudyLevelMenuVisible] = useState(false);
   const [preferredTimeMenuVisible, setPreferredTimeMenuVisible] =
     useState(false);
+  const [sessionType, setSessionType] = useState("Pomodoro");
+
+  const [mainGoal, setMainGoal] = useState("Improve consistency");
+
+  const [communicationStyle, setCommunicationStyle] = useState("Silent focus");
+
+  const [partnerPreference, setPartnerPreference] = useState("Strict");
+
+  const [groupPreference, setGroupPreference] = useState("One-to-one");
 
   useEffect(() => {
     loadProfile();
@@ -50,6 +59,17 @@ export default function EditProfileScreen() {
       profile?.studyPreferences?.accountabilityLevel ?? 50,
     );
     setPreferredTime(profile?.availability?.preferredTime ?? "");
+    setSessionType(profile?.studyPreferences?.sessionType ?? "Pomodoro");
+
+    setMainGoal(profile?.studyGoals?.mainGoal ?? "Improve consistency");
+
+    setCommunicationStyle(
+      profile?.studyStyle?.communicationStyle ?? "Silent focus",
+    );
+
+    setPartnerPreference(profile?.studyStyle?.partnerPreference ?? "Strict");
+
+    setGroupPreference(profile?.studyStyle?.groupPreference ?? "One-to-one");
 
     setLoading(false);
   };
@@ -77,13 +97,19 @@ export default function EditProfileScreen() {
         subject,
         studyLevel,
 
+        "studyGoals.mainGoal": mainGoal,
         "studyGoals.dailyStudyMinutes": Number(dailyStudyMinutes),
         "studyGoals.weeklyStudyDays": Number(weeklyStudyDays),
 
+        "studyPreferences.sessionType": sessionType,
         "studyPreferences.focusLevel": focusLevel,
         "studyPreferences.accountabilityLevel": accountabilityLevel,
 
         "availability.preferredTime": preferredTime,
+
+        "studyStyle.communicationStyle": communicationStyle,
+        "studyStyle.partnerPreference": partnerPreference,
+        "studyStyle.groupPreference": groupPreference,
 
         updatedAt: serverTimestamp(),
       });
@@ -163,6 +189,14 @@ export default function EditProfileScreen() {
       <Text style={styles.sectionTitle}>Study Goals</Text>
 
       <TextInput
+        label="Main Goal"
+        mode="outlined"
+        value={mainGoal}
+        onChangeText={setMainGoal}
+        style={styles.input}
+      />
+
+      <TextInput
         label="Daily Study Minutes"
         mode="outlined"
         value={dailyStudyMinutes}
@@ -181,6 +215,19 @@ export default function EditProfileScreen() {
       />
 
       <Text style={styles.sectionTitle}>Study Preferences</Text>
+
+      <Text style={styles.sectionTitle}>Session Type</Text>
+
+      <View style={styles.optionRow}>
+        {["Pomodoro", "Long Session"].map((type) => (
+          <SmallOption
+            key={type}
+            title={type}
+            selected={sessionType === type}
+            onPress={() => setSessionType(type)}
+          />
+        ))}
+      </View>
 
       <Text style={styles.sliderLabel}>Focus Level: {focusLevel}%</Text>
       <Slider
@@ -237,6 +284,43 @@ export default function EditProfileScreen() {
         ))}
       </Menu>
 
+      <Text style={styles.sectionTitle}>Study Style</Text>
+
+      <View style={styles.optionColumn}>
+        {["Silent focus", "Light discussion", "Active collaboration"].map(
+          (style) => (
+            <SmallOption
+              key={style}
+              title={style}
+              selected={communicationStyle === style}
+              onPress={() => setCommunicationStyle(style)}
+            />
+          ),
+        )}
+      </View>
+
+      <View style={styles.optionRow}>
+        {["Strict", "Flexible"].map((preference) => (
+          <SmallOption
+            key={preference}
+            title={preference}
+            selected={partnerPreference === preference}
+            onPress={() => setPartnerPreference(preference)}
+          />
+        ))}
+      </View>
+
+      <View style={styles.optionRow}>
+        {["One-to-one", "Group"].map((group) => (
+          <SmallOption
+            key={group}
+            title={group}
+            selected={groupPreference === group}
+            onPress={() => setGroupPreference(group)}
+          />
+        ))}
+      </View>
+
       <Button
         mode="contained"
         style={styles.saveButton}
@@ -255,6 +339,27 @@ export default function EditProfileScreen() {
         Cancel
       </Button>
     </ScrollView>
+  );
+}
+
+function SmallOption({
+  title,
+  selected,
+  onPress,
+}: {
+  title: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.smallOption, selected && styles.selectedCard]}
+    >
+      <Text style={[styles.optionTitle, selected && styles.selectedText]}>
+        {title}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -297,5 +402,33 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     color: "#555",
     fontWeight: "bold",
+  },
+  optionRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+    flexWrap: "wrap",
+  },
+  optionColumn: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  smallOption: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  selectedCard: {
+    backgroundColor: "#8B5CF6",
+    borderColor: "#8B5CF6",
+  },
+  selectedText: {
+    color: "#fff",
+  },
+  optionTitle: {
+    fontWeight: "bold",
+    color: "#333",
   },
 });

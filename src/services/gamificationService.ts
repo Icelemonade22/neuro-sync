@@ -6,6 +6,7 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
+import { createInAppNotification } from "./notificationCenterService";
 
 function calculateLevel(xp: number) {
   return Math.floor(xp / 100) + 1;
@@ -65,6 +66,8 @@ export async function awardUserXP(uid: string, xpAmount: number) {
   if (!userSnap.exists()) return;
 
   const currentXP = userSnap.data().xp ?? 0;
+  const currentLevel = userSnap.data().level ?? calculateLevel(currentXP);
+
   const newXP = currentXP + xpAmount;
   const newLevel = calculateLevel(newXP);
 
@@ -74,6 +77,15 @@ export async function awardUserXP(uid: string, xpAmount: number) {
     level: newLevel,
     updatedAt: serverTimestamp(),
   });
+
+  if (newLevel > currentLevel) {
+    await createInAppNotification({
+      userId: uid,
+      title: "🎉 Level Up!",
+      message: `You reached Level ${newLevel}. Keep going!`,
+      type: "achievement",
+    });
+  }
 }
 
 export async function unlockBadge(uid: string, badgeName: string) {
@@ -89,6 +101,13 @@ export async function unlockBadge(uid: string, badgeName: string) {
   await updateDoc(userRef, {
     badges: [...badges, badgeName],
     updatedAt: serverTimestamp(),
+  });
+
+  await createInAppNotification({
+    userId: uid,
+    title: "🏆 Achievement Unlocked",
+    message: `You earned the "${badgeName}" badge.`,
+    type: "achievement",
   });
 
   return true;

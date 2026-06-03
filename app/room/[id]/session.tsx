@@ -5,6 +5,7 @@ import {
   unlockBadge,
   updateStudyStreak,
 } from "@/src/services/gamificationService";
+import { createInAppNotification } from "@/src/services/notificationCenterService";
 import {
   listenRoomMessages,
   sendRoomMessage,
@@ -35,6 +36,7 @@ import {
 } from "react-native";
 import { Button, Text, TextInput } from "react-native-paper";
 
+//const SESSION_DURATION = 25 * 60; // 25 minutes in seconds
 const SESSION_DURATION = 30;
 
 export default function SharedRoomSessionScreen() {
@@ -203,10 +205,41 @@ export default function SharedRoomSessionScreen() {
   const handleStartPause = async () => {
     if (!sessionId || !session) return;
 
+    const isStarting = !session.isRunning;
+    const currentUser = auth.currentUser;
+
+    console.log("SESSION START CLICKED");
+    console.log("isStarting:", isStarting);
+    console.log("currentUser:", currentUser?.uid);
+    console.log("room participants:", room?.participants);
+
     await updateRoomSession(sessionId, {
-      isRunning: !session.isRunning,
+      isRunning: isStarting,
       startedAt: session.startedAt ?? serverTimestamp(),
     });
+
+    if (isStarting && room?.participants?.length > 0) {
+      const targetUsers = room.participants.filter(
+        (userId: string) => userId !== currentUser?.uid,
+      );
+
+      console.log("notification targets:", targetUsers);
+
+      await Promise.all(
+        targetUsers.map((userId: string) =>
+          createInAppNotification({
+            userId,
+            title: "Shared session started 🎯",
+            message: `${
+              currentUser?.email ?? "A study partner"
+            } started a shared study session.`,
+            type: "session",
+          }),
+        ),
+      );
+
+      console.log("notifications created");
+    }
   };
 
   const handleReset = async () => {
@@ -261,6 +294,23 @@ export default function SharedRoomSessionScreen() {
       auth.currentUser.email ?? "Student",
       messageText,
     );
+
+    if (room?.participants?.length > 0) {
+      await Promise.all(
+        room.participants
+          .filter((userId: string) => userId !== auth.currentUser?.uid)
+          .map((userId: string) =>
+            createInAppNotification({
+              userId,
+              title: "💬 New Room Message",
+              message: `${
+                auth.currentUser?.email ?? "A study partner"
+              } sent a message in your study room.`,
+              type: "message",
+            }),
+          ),
+      );
+    }
 
     setMessageText("");
   };
@@ -319,29 +369,83 @@ export default function SharedRoomSessionScreen() {
       <View style={styles.timerCircle}>
         <Text style={styles.timerText}>{formatTime(session.secondsLeft)}</Text>
         <Text style={styles.statusText}>
-          {session.isRunning ? "Studying together..." : "Paused"}
+          {session.secondsLeft <= 0
+            ? "Session completed 🎉"
+            : session.isRunning
+              ? "Studying together..."
+              : "Paused"}
         </Text>
       </View>
 
-      <Button
+      <View style={styles.meetingCard}>
+        <Text style={styles.meetingTitle}>📹 Online Meeting</Text>
+
+        <Text style={styles.meetingSubtitle}>
+          Join a live video call with your study partner during this shared
+          session.
+        </Text>
+
+        <Button
+          mode="contained"
+          icon="video"
+          style={styles.meetingButton}
+          onPress={() => {
+            const meetingName =
+              room?.name?.replace(/\s+/g, "-").toLowerCase() ??
+              `room-${roomId}`;
+
+            Linking.openURL(`https://meet.jit.si/neurosync-${meetingName}`);
+          }}
+        >
+          Join Meeting
+        </Button>
+      </View>
+
+      {/* <Button
         mode="contained"
         style={styles.mainButton}
-        onPress={handleStartPause}
+        onPress={session.secondsLeft <= 0 ? handleReset : handleStartPause}
       >
-        {session.isRunning ? "Pause Session" : "Start Session"}
-      </Button>
+        {session.secondsLeft <= 0
+          ? "Start New Session"
+          : session.isRunning
+            ? "Pause Session"
+            : "Start Session"}
+      </Button> */}
 
-      <Button
-        mode="outlined"
-        style={styles.outlineButton}
-        onPress={handleReset}
-      >
-        Reset
-      </Button>
+      {session.secondsLeft <= 0 ? (
+        <Button
+          mode="contained"
+          style={styles.mainButton}
+          onPress={handleReset}
+        >
+          Start New Session
+        </Button>
+      ) : (
+        <Button
+          mode="contained"
+          style={styles.mainButton}
+          onPress={handleStartPause}
+        >
+          {session.isRunning ? "Pause Session" : "Start Session"}
+        </Button>
+      )}
 
-      <Button mode="text" onPress={handleCompleteEarly}>
-        Complete Session
-      </Button>
+      {session.secondsLeft > 0 && (
+        <>
+          <Button
+            mode="outlined"
+            style={styles.outlineButton}
+            onPress={handleReset}
+          >
+            Reset
+          </Button>
+
+          <Button mode="text" onPress={handleCompleteEarly}>
+            Complete Session
+          </Button>
+        </>
+      )}
 
       <Button mode="text" onPress={() => router.back()}>
         Back to Room
@@ -703,5 +807,38 @@ const styles = StyleSheet.create({
 
   activeTabText: {
     color: "#FFFFFF",
+  },
+
+  meetingCard: {
+    backgroundColor: "#F8F5FF",
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  meetingTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#6D28D9",
+    marginBottom: 8,
+  },
+
+  meetingSubtitle: {
+    color: "#6B7280",
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+
+  meetingButton: {
+    backgroundColor: "#4F46E5",
+    borderRadius: 20,
   },
 });

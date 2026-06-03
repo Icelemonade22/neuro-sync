@@ -5,6 +5,8 @@ type Props = {
   visible: boolean;
   title: string;
   xp: number;
+  heading?: string;
+  emoji?: string;
   onClose: () => void;
 };
 
@@ -12,19 +14,21 @@ export default function AchievementModal({
   visible,
   title,
   xp,
+  heading = "Achievement Unlocked!",
+  emoji = "🎉",
   onClose,
 }: Props) {
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.modal}>
-          <Text style={styles.emoji}>🎉</Text>
+          <Text style={styles.emoji}>{emoji}</Text>
 
-          <Text style={styles.title}>Achievement Unlocked!</Text>
+          <Text style={styles.title}>{heading}</Text>
 
           <Text style={styles.badge}>{title}</Text>
 
-          <Text style={styles.xp}>+{xp} XP</Text>
+          {xp > 0 && <Text style={styles.xp}>+{xp} XP</Text>}
 
           <Button mode="contained" onPress={onClose} style={styles.button}>
             Awesome

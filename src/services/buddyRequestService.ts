@@ -103,6 +103,7 @@ export async function createStudyRoomFromRequest(request: any) {
   await setDoc(roomRef, {
     participants: [request.fromUserId, request.toUserId],
     participantNames: [request.fromName, request.toName],
+
     requestId: request.id,
     status: "active",
     sessionType: "Pomodoro",

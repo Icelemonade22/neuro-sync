@@ -6,6 +6,7 @@ export async function getAdminDashboardStats() {
   const roomsSnap = await getDocs(collection(db, "studyRooms"));
   const notesSnap = await getDocs(collection(db, "notes"));
   const sessionsSnap = await getDocs(collection(db, "studySessions"));
+  const reportsSnap = await getDocs(collection(db, "reports"));
 
   let totalQuizzesCompleted = 0;
 
@@ -13,12 +14,22 @@ export async function getAdminDashboardStats() {
     totalQuizzesCompleted += doc.data().totalQuizzesCompleted ?? 0;
   });
 
+  const pendingReports = reportsSnap.docs.filter(
+    (doc) => doc.data().status === "Pending",
+  ).length;
+
+  const resolvedReports = reportsSnap.docs.filter(
+    (doc) => doc.data().status === "Resolved",
+  ).length;
+
   return {
     totalUsers: usersSnap.size,
     totalRooms: roomsSnap.size,
     totalNotes: notesSnap.size,
     totalSessions: sessionsSnap.size,
     totalQuizzesCompleted,
+    pendingReports,
+    resolvedReports,
   };
 }
 

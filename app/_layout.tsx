@@ -14,15 +14,19 @@ export default function RootLayout() {
           <Stack.Screen name="assistant" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="uploadNote" options={{ headerShown: false }} />
+          <Stack.Screen name="feedback" options={{ headerShown: false }} />
 
           <Stack.Screen name="room/[id]" options={{ title: "Study Room" }} />
           <Stack.Screen name="quiz" options={{ headerShown: false }} />
           <Stack.Screen name="dailyMissions" options={{ headerShown: false }} />
+          <Stack.Screen name="notifications" options={{ headerShown: false }} />
+          <Stack.Screen name="hallOfFame" options={{ headerShown: false }} />
 
           <Stack.Screen name="admin/index" options={{ headerShown: false }} />
           <Stack.Screen name="admin/users" options={{ headerShown: false }} />
           <Stack.Screen name="admin/notes" options={{ headerShown: false }} />
           <Stack.Screen name="admin/rooms" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/reports" options={{ headerShown: false }} />
 
           <Stack.Screen
             name="room/[id]/session"

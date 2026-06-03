@@ -1,6 +1,14 @@
 import { auth } from "@/config/firebase";
 import { askStudyAssistant } from "@/src/services/aiAssistantService";
+import {
+  getChatHistory,
+  saveChatMessage,
+} from "@/src/services/chatHistoryService";
 import { getUserProfile } from "@/src/services/getUserProfile";
+import { getUserSessions } from "@/src/services/getUserSessions";
+import { calculateAnalytics } from "@/src/utils/calculateAnalytics";
+import { generateAnalyticsInsights } from "@/src/utils/generateAnalyticsInsights";
+import { generateStudyForecast } from "@/src/utils/generateStudyForecast";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -24,6 +32,9 @@ export default function AssistantScreen() {
   ]);
   const [profile, setProfile] = useState<any>(null);
   const [thinking, setThinking] = useState(false);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [insights, setInsights] = useState<any>(null);
+  const [forecast, setForecast] = useState<any>(null);
 
   const handleSend = async () => {
     if (!question.trim() || thinking) return;
@@ -40,7 +51,13 @@ export default function AssistantScreen() {
     setThinking(true);
 
     try {
-      const answer = await askStudyAssistant(userQuestion, profile);
+      const answer = await askStudyAssistant(
+        userQuestion,
+        profile,
+        analytics,
+        insights,
+        forecast,
+      );
 
       const assistantMessage = {
         role: "assistant",
@@ -48,6 +65,12 @@ export default function AssistantScreen() {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      const user = auth.currentUser;
+
+      if (user) {
+        await saveChatMessage(user.uid, userQuestion, answer);
+      }
     } catch (error) {
       console.log("FULL AI ERROR:", error);
 
@@ -66,10 +89,46 @@ export default function AssistantScreen() {
   useEffect(() => {
     const loadProfile = async () => {
       const user = auth.currentUser;
+
       if (!user) return;
 
-      const data = await getUserProfile(user.uid);
-      setProfile(data);
+      const history = await getChatHistory(user.uid);
+
+      if (history.length > 0) {
+        const restoredMessages: any[] = [];
+
+        history.forEach((item: any) => {
+          restoredMessages.push({
+            role: "user",
+            text: item.question,
+          });
+
+          restoredMessages.push({
+            role: "assistant",
+            text: item.answer,
+          });
+        });
+
+        setMessages(restoredMessages);
+      }
+
+      const profileData = await getUserProfile(user.uid);
+      setProfile(profileData);
+
+      const sessions = await getUserSessions(user.uid);
+
+      const analyticsResult = calculateAnalytics(sessions);
+      setAnalytics(analyticsResult);
+
+      const insightResult = generateAnalyticsInsights(sessions);
+      setInsights(insightResult);
+
+      const forecastResult = generateStudyForecast(
+        analyticsResult,
+        insightResult,
+      );
+
+      setForecast(forecastResult);
     };
 
     loadProfile();
@@ -86,6 +145,19 @@ export default function AssistantScreen() {
         </TouchableOpacity>
 
         <Text style={styles.title}>Study Assistant 🤖</Text>
+
+        <TouchableOpacity
+          onPress={() =>
+            setMessages([
+              {
+                role: "assistant",
+                text: "Hi 👋 I'm your NeuroSync Study Assistant. Ask me anything about studying, focus, productivity, or motivation.",
+              },
+            ])
+          }
+        >
+          <Ionicons name="trash-outline" size={24} color="#8B5CF6" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -119,6 +191,16 @@ export default function AssistantScreen() {
             </View>
           );
         })}
+
+        {thinking && (
+          <View style={styles.assistantWrapper}>
+            <View style={styles.assistantBubble}>
+              <Text style={styles.messageText}>
+                🤖 NeuroSync is thinking...
+              </Text>
+            </View>
+          </View>
+        )}
       </ScrollView>
 
       <View style={styles.suggestionRow}>
@@ -179,6 +261,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "bold",
+    flex: 1,
   },
 
   chatContainer: {

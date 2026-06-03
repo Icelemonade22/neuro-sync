@@ -1,4 +1,6 @@
+import AchievementModal from "@/components/achievementModal";
 import { auth } from "@/config/firebase";
+import { getTodayDailyMissions } from "@/src/services/dailyMissionService";
 import { uploadNote } from "@/src/services/noteService";
 import * as DocumentPicker from "expo-document-picker";
 import { router } from "expo-router";
@@ -12,6 +14,11 @@ export default function UploadNoteScreen() {
   const [file, setFile] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [content, setContent] = useState("");
+  const [achievementVisible, setAchievementVisible] = useState(false);
+  const [achievementData, setAchievementData] = useState({
+    title: "",
+    xp: 0,
+  });
 
   const pickFile = async () => {
     const result = await DocumentPicker.getDocumentAsync({
@@ -47,8 +54,20 @@ export default function UploadNoteScreen() {
         user.email ?? "Student",
       );
 
-      Alert.alert("Uploaded", "Your note has been uploaded.");
-      router.back();
+      const missions = await getTodayDailyMissions();
+
+      const noteMission = missions.find(
+        (mission: any) => mission.id === "note",
+      );
+
+      setAchievementData({
+        title: noteMission?.completed
+          ? "Note Uploaded Successfully"
+          : "Upload 1 Note Mission Completed",
+        xp: noteMission?.completed ? 0 : 40,
+      });
+
+      setAchievementVisible(true);
     } catch (error: any) {
       console.log("UPLOAD ERROR:", JSON.stringify(error, null, 2));
       console.log("UPLOAD ERROR RAW:", error);
@@ -106,6 +125,18 @@ export default function UploadNoteScreen() {
       <Button mode="text" onPress={() => router.back()}>
         Cancel
       </Button>
+
+      <AchievementModal
+        visible={achievementVisible}
+        heading="Mission Completed!"
+        emoji="📚"
+        title={achievementData.title}
+        xp={achievementData.xp}
+        onClose={() => {
+          setAchievementVisible(false);
+          router.back();
+        }}
+      />
     </ScrollView>
   );
 }

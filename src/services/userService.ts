@@ -58,6 +58,15 @@ export async function saveOnboardingData(data: OnboardingData) {
         groupPreference: data.groupPreference,
       },
 
+      role: "user",
+      xp: 0,
+      weeklyXp: 0,
+      level: 1,
+      streak: 0,
+      longestStreak: 0,
+      badges: [],
+      online: true,
+
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
     },

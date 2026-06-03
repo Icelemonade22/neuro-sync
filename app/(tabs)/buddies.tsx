@@ -5,6 +5,7 @@ import {
 } from "@/src/services/buddyRequestService";
 import { getStudyBuddies } from "@/src/services/getStudyBuddies";
 import { getUserProfile } from "@/src/services/getUserProfile";
+import { createReport } from "@/src/services/reportService";
 import { calculateCompatibility } from "@/src/utils/calculateCompatibility";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -16,7 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Text } from "react-native-paper";
+import { Button, Text } from "react-native-paper";
 
 export default function BuddiesScreen() {
   const [loading, setLoading] = useState(true);
@@ -94,6 +95,32 @@ export default function BuddiesScreen() {
     }
   };
 
+  const handleReportUser = async (buddy: any) => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      Alert.alert("Error", "You must be logged in to report a user.");
+      return;
+    }
+
+    try {
+      await createReport({
+        type: "User Report",
+        title: `Reported User: ${buddy.fullName ?? buddy.email ?? "User"}`,
+        description: `The user "${
+          buddy.fullName ?? buddy.email ?? "User"
+        }" was reported by another user.`,
+        reportedBy: user.email ?? "Student",
+        relatedItemId: buddy.uid ?? buddy.id,
+        relatedItemType: "user",
+      });
+
+      Alert.alert("Reported", "This user has been reported to the admin.");
+    } catch (error: any) {
+      Alert.alert("Error", error?.message ?? "Failed to report user.");
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -105,7 +132,7 @@ export default function BuddiesScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
+      contentContainerStyle={{ paddingBottom: 180 }}
     >
       <Text style={styles.title}>Find Study Buddy 🤝</Text>
       <Text style={styles.subtitle}>
@@ -203,6 +230,13 @@ export default function BuddiesScreen() {
                         : "Connect"}
                 </Text>
               </TouchableOpacity>
+              <Button
+                mode="text"
+                textColor="#EF4444"
+                onPress={() => handleReportUser(buddy)}
+              >
+                Report User
+              </Button>
             </View>
           );
         })
@@ -216,7 +250,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
     padding: 24,
-    paddingTop: 20,
+    paddingTop: 60,
   },
   center: {
     flex: 1,

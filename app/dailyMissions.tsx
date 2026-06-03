@@ -2,33 +2,13 @@ import AchievementModal from "@/components/achievementModal";
 import {
   initializeDailyMissions,
   listenDailyMissions,
+  markCompletedMissionsClaimed,
 } from "@/src/services/dailyMissionService";
 import { rewardMissionXp } from "@/src/services/missionService";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Button, Checkbox, Text } from "react-native-paper";
-
-const initialMissions = [
-  {
-    id: 1,
-    title: "Complete 1 Quiz",
-    xp: 20,
-    completed: false,
-  },
-  {
-    id: "study",
-    title: "Complete 1 Focus Session",
-    xp: 30,
-    completed: false,
-  },
-  {
-    id: 3,
-    title: "Upload 1 Note",
-    xp: 40,
-    completed: false,
-  },
-];
 
 export default function DailyMissionsScreen() {
   const [missions, setMissions] = useState<any[]>([]);
@@ -56,28 +36,37 @@ export default function DailyMissionsScreen() {
   const completedCount = missions.filter((m) => m.completed).length;
 
   const handleClaimRewards = async () => {
-    const totalXp = missions
-      .filter((mission) => mission.completed)
-      .reduce((sum, mission) => sum + mission.xp, 0);
+    const claimableMissions = missions.filter(
+      (mission) => mission.completed && !mission.claimed,
+    );
 
-    if (totalXp <= 0 || claimed) return;
+    const totalXp = claimableMissions.reduce(
+      (sum, mission) => sum + mission.xp,
+      0,
+    );
+
+    if (totalXp <= 0) return;
 
     await rewardMissionXp(totalXp);
 
+    await markCompletedMissionsClaimed(
+      claimableMissions.map((mission) => mission.id),
+    );
+
     setAchievementData({
-      title: "Daily Missions Completed",
+      title: "Daily Mission Rewards",
       xp: totalXp,
     });
 
     setAchievementVisible(true);
-    setClaimed(true);
   };
 
   useEffect(() => {
     initializeDailyMissions();
 
     const unsubscribe = listenDailyMissions((data) => {
-      setMissions(data);
+      setMissions(data.missions);
+      setClaimed(data.claimed);
     });
 
     return unsubscribe;
@@ -122,13 +111,19 @@ export default function DailyMissionsScreen() {
         mode="contained"
         style={styles.button}
         onPress={handleClaimRewards}
-        disabled={claimed || completedCount === 0}
+        disabled={
+          !missions.some((mission) => mission.completed && !mission.claimed)
+        }
       >
-        {claimed ? "Rewards Claimed" : "Claim Rewards"}
+        {missions.some((mission) => mission.completed && !mission.claimed)
+          ? "Claim Rewards"
+          : "No Rewards to Claim"}
       </Button>
 
       <AchievementModal
         visible={achievementVisible}
+        heading="Reward Claimed!"
+        emoji="✨"
         title={achievementData.title}
         xp={achievementData.xp}
         onClose={() => setAchievementVisible(false)}

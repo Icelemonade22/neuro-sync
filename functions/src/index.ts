@@ -10,7 +10,7 @@ export const askStudyAssistantHttp = onRequest(
     cors: true,
   },
   async (req, res) => {
-    const { question, profile } = req.body;
+    const { question, profile, analytics, insights, forecast } = req.body;
 
     if (!question) {
       res.status(400).json({
@@ -34,11 +34,33 @@ Student profile:
 - Focus level: ${profile?.studyPreferences?.focusLevel ?? "Unknown"}%
 - Daily goal: ${profile?.studyGoals?.dailyStudyMinutes ?? "Unknown"} minutes
 
+Student progress:
+- Focus Score: ${analytics?.focusScore ?? 0}
+- Total Sessions: ${analytics?.totalSessions ?? 0}
+- Total Study Hours: ${analytics?.totalHours ?? 0}
+- Current Streak: ${profile?.streak ?? 0}
+
+Weekly insights:
+- Best Study Day: ${insights?.bestStudyDay ?? "Unknown"}
+- Consistency: ${insights?.consistency ?? "Unknown"}
+
+Forecast:
+- Projected Focus Score: ${forecast?.projectedFocusScore ?? 0}
+- Projected Sessions: ${forecast?.projectedSessions ?? 0}
+
+Achievements:
+${profile?.badges?.join(", ") ?? "None"}
+
 Student question:
 ${question}
 
-Give a helpful, clear, student-friendly answer.
-Keep it concise.
+Answer using the student's actual progress and study data whenever relevant.
+
+Keep responses concise and personalized.
+
+Never use markdown formatting.
+Do not use **bold**, *, #, bullet markdown, or code blocks.
+Return plain readable text only.
 `;
 
     try {

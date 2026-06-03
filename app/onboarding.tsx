@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Button, Text, TextInput } from "react-native-paper";
+import { Button, Menu, Text, TextInput } from "react-native-paper";
 
 export default function OnboardingScreen() {
   const [fullName, setFullName] = useState("");
@@ -29,6 +29,9 @@ export default function OnboardingScreen() {
   const [communicationStyle, setCommunicationStyle] = useState("Silent focus");
   const [partnerPreference, setPartnerPreference] = useState("Strict");
   const [groupPreference, setGroupPreference] = useState("One-to-one");
+  const [studyLevelMenuVisible, setStudyLevelMenuVisible] = useState(false);
+  const [preferredTimeMenuVisible, setPreferredTimeMenuVisible] =
+    useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -93,7 +96,7 @@ export default function OnboardingScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.step}>Step 1 of 4</Text>
+      {/* <Text style={styles.step}>Step 1 of 4</Text> */}
       <Text style={styles.title}>Profile Setup</Text>
       <Text style={styles.subtitle}>Tell us about yourself</Text>
 
@@ -113,13 +116,36 @@ export default function OnboardingScreen() {
         style={styles.input}
       />
 
-      <TextInput
-        label="Study Level"
-        value={studyLevel}
-        onChangeText={setStudyLevel}
-        mode="outlined"
-        style={styles.input}
-      />
+      <Menu
+        visible={studyLevelMenuVisible}
+        onDismiss={() => setStudyLevelMenuVisible(false)}
+        anchor={
+          <TouchableOpacity onPress={() => setStudyLevelMenuVisible(true)}>
+            <TextInput
+              label="Study Level"
+              value={studyLevel}
+              mode="outlined"
+              editable={false}
+              pointerEvents="none"
+              right={<TextInput.Icon icon="menu-down" />}
+              style={styles.input}
+            />
+          </TouchableOpacity>
+        }
+      >
+        {["Foundation", "Diploma", "Undergraduate", "Postgraduate"].map(
+          (level) => (
+            <Menu.Item
+              key={level}
+              title={level}
+              onPress={() => {
+                setStudyLevel(level);
+                setStudyLevelMenuVisible(false);
+              }}
+            />
+          ),
+        )}
+      </Menu>
 
       <Text style={styles.sectionTitle}>Study Preferences</Text>
 
@@ -217,16 +243,34 @@ export default function OnboardingScreen() {
 
       <Text style={styles.sectionTitle}>Availability</Text>
 
-      <View style={styles.optionRow}>
-        {["Morning", "Afternoon", "Night"].map((time) => (
-          <SmallOption
+      <Menu
+        visible={preferredTimeMenuVisible}
+        onDismiss={() => setPreferredTimeMenuVisible(false)}
+        anchor={
+          <TouchableOpacity onPress={() => setPreferredTimeMenuVisible(true)}>
+            <TextInput
+              label="Preferred Time"
+              value={preferredTime}
+              mode="outlined"
+              editable={false}
+              pointerEvents="none"
+              right={<TextInput.Icon icon="menu-down" />}
+              style={styles.input}
+            />
+          </TouchableOpacity>
+        }
+      >
+        {["Morning", "Afternoon", "Evening", "Night", "Anytime"].map((time) => (
+          <Menu.Item
             key={time}
             title={time}
-            selected={preferredTime === time}
-            onPress={() => setPreferredTime(time)}
+            onPress={() => {
+              setPreferredTime(time);
+              setPreferredTimeMenuVisible(false);
+            }}
           />
         ))}
-      </View>
+      </Menu>
 
       <Text style={styles.sectionTitle}>Study Style</Text>
 

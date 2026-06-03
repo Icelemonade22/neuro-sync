@@ -1,9 +1,12 @@
+import { auth } from "@/config/firebase";
 import { listenNotes } from "@/src/services/noteService";
+import { createReport } from "@/src/services/reportService";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -14,6 +17,30 @@ import { Button, Text } from "react-native-paper";
 export default function NotesScreen() {
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleReportNote = async (note: any) => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      Alert.alert("Error", "You must be logged in to report a note.");
+      return;
+    }
+
+    try {
+      await createReport({
+        type: "Inappropriate Content",
+        title: `Reported Note: ${note.title}`,
+        description: `The note "${note.title}" was reported by a user.`,
+        reportedBy: user.email ?? "Student",
+        relatedItemId: note.id,
+        relatedItemType: "note",
+      });
+
+      Alert.alert("Reported", "This note has been reported to the admin.");
+    } catch (error: any) {
+      Alert.alert("Error", error?.message ?? "Failed to report note.");
+    }
+  };
 
   useEffect(() => {
     const unsubscribe = listenNotes((data) => {
@@ -67,12 +94,19 @@ export default function NotesScreen() {
                   params: {
                     title: note.title,
                     subject: note.subject,
-                    content: note.content,
+                    content: note.content ?? "",
                   },
                 })
               }
             >
               Generate Quiz
+            </Button>
+            <Button
+              mode="text"
+              textColor="#EF4444"
+              onPress={() => handleReportNote(note)}
+            >
+              Report Note
             </Button>
           </View>
         ))

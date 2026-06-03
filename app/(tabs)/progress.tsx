@@ -1,8 +1,13 @@
 import { auth } from "@/config/firebase";
+import { getUserProfile } from "@/src/services/getUserProfile";
 import { getUserSessions } from "@/src/services/getUserSessions";
 import { calculateAnalytics } from "@/src/utils/calculateAnalytics";
 import { calculateWeeklyActivity } from "@/src/utils/calculateWeeklyActivity";
+import { generateAISummary } from "@/src/utils/generateAISummary";
 import { generateAnalyticsInsights } from "@/src/utils/generateAnalyticsInsights";
+import { generateStudyForecast } from "@/src/utils/generateStudyForecast";
+import { generateWeeklyStudyReport } from "@/src/utils/generateWeeklyStudyReport";
+import { getNextAchievement } from "@/src/utils/getNextAchievement";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -19,9 +24,14 @@ const screenWidth = Dimensions.get("window").width;
 
 export default function ProgressScreen() {
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
   const [weeklyData, setWeeklyData] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
   const [insights, setInsights] = useState<any>(null);
+  const [weeklyReport, setWeeklyReport] = useState<any>(null);
+  const [forecast, setForecast] = useState<any>(null);
+  const [aiSummary, setAiSummary] = useState("");
+  const [nextAchievement, setNextAchievement] = useState<any>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -39,13 +49,31 @@ export default function ProgressScreen() {
       return;
     }
 
+    const profile = await getUserProfile(user.uid);
+    setProfile(profile);
+
     const sessions = await getUserSessions(user.uid);
-    const result = calculateAnalytics(sessions);
+
+    const result = calculateAnalytics(sessions, profile?.streak ?? 0);
+    setAnalytics(result);
+
     const weekly = calculateWeeklyActivity(sessions);
     const smartInsights = generateAnalyticsInsights(sessions);
     setInsights(smartInsights);
 
-    setAnalytics(result);
+    const forecastData = generateStudyForecast(result, smartInsights);
+    setForecast(forecastData);
+
+    const summary = generateAISummary(result, smartInsights, forecastData);
+    setAiSummary(summary);
+
+    const achievementData = getNextAchievement(profile, result);
+    setNextAchievement(achievementData);
+
+    const report = generateWeeklyStudyReport(result, smartInsights, profile);
+
+    setWeeklyReport(report);
+
     setWeeklyData(weekly);
     setLoading(false);
   };
@@ -61,7 +89,7 @@ export default function ProgressScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
+      contentContainerStyle={{ paddingBottom: 180 }}
     >
       <Text style={styles.title}>Your Progress 📈</Text>
 
@@ -90,6 +118,100 @@ export default function ProgressScreen() {
           subtitle="Weekly habit"
         />
       </View>
+
+      <View style={styles.breakdownCard}>
+        <Text style={styles.insightTitle}>🎯 Focus Score Breakdown</Text>
+
+        <Text style={styles.insightText}>
+          Session Score: {analytics.sessionScore}
+        </Text>
+
+        <Text style={styles.insightText}>
+          Consistency Score: {analytics.consistencyScore}
+        </Text>
+
+        <Text style={styles.insightText}>
+          Streak Score: {analytics.streakScore}
+        </Text>
+      </View>
+
+      {weeklyReport && (
+        <View style={styles.weeklyReportCard}>
+          <Text style={styles.weeklyReportTitle}>{weeklyReport.title}</Text>
+
+          <View style={styles.reportRow}>
+            <Text style={styles.reportLabel}>Study Time</Text>
+            <Text style={styles.reportValue}>{weeklyReport.studyTime}</Text>
+          </View>
+
+          <View style={styles.reportRow}>
+            <Text style={styles.reportLabel}>Sessions</Text>
+            <Text style={styles.reportValue}>{weeklyReport.sessions}</Text>
+          </View>
+
+          <View style={styles.reportRow}>
+            <Text style={styles.reportLabel}>Focus Score</Text>
+            <Text style={styles.reportValue}>{weeklyReport.focusScore}</Text>
+          </View>
+
+          <View style={styles.reportDivider} />
+
+          <Text style={styles.reportSectionTitle}>Strength</Text>
+          <Text style={styles.reportText}>{weeklyReport.strength}</Text>
+
+          <Text style={styles.reportSectionTitle}>Recommendation</Text>
+          <Text style={styles.reportText}>{weeklyReport.recommendation}</Text>
+
+          <Text style={styles.reportSectionTitle}>Outlook</Text>
+          <Text style={styles.reportText}>{weeklyReport.outlook}</Text>
+        </View>
+      )}
+
+      {forecast && (
+        <View style={styles.forecastCard}>
+          <Text style={styles.forecastTitle}>{forecast.title}</Text>
+
+          <Text style={styles.forecastSubtitle}>
+            Based on your current weekly pace
+          </Text>
+
+          <View style={styles.forecastGrid}>
+            <View style={styles.forecastItem}>
+              <Text style={styles.forecastValue}>
+                {forecast.projectedHours}h
+              </Text>
+              <Text style={styles.forecastLabel}>Expected Time</Text>
+            </View>
+
+            <View style={styles.forecastItem}>
+              <Text style={styles.forecastValue}>
+                {forecast.projectedSessions}
+              </Text>
+              <Text style={styles.forecastLabel}>Expected Sessions</Text>
+            </View>
+
+            <View style={styles.forecastItem}>
+              <Text style={styles.forecastValue}>
+                {forecast.projectedFocusScore}
+              </Text>
+              <Text style={styles.forecastLabel}>Projected Score</Text>
+            </View>
+          </View>
+
+          <View style={styles.forecastStatusBox}>
+            <Text style={styles.forecastStatusLabel}>Status</Text>
+            <Text style={styles.forecastStatusValue}>{forecast.status}</Text>
+          </View>
+        </View>
+      )}
+
+      {aiSummary ? (
+        <View style={styles.aiSummaryCard}>
+          <Text style={styles.aiSummaryTitle}>AI Weekly Summary 🤖</Text>
+
+          <Text style={styles.aiSummaryText}>{aiSummary}</Text>
+        </View>
+      ) : null}
 
       <Text style={styles.sectionTitle}>Weekly Study Activity</Text>
 
@@ -150,13 +272,51 @@ export default function ProgressScreen() {
 
       <Text style={styles.sectionTitle}>Recent Achievements</Text>
 
-      <View style={styles.achievementCard}>
-        <Text style={styles.achievementText}>🏅 First Focus Session</Text>
-      </View>
+      {profile?.badges?.length > 0 ? (
+        profile.badges.slice(0, 3).map((badge: string) => (
+          <View key={badge} style={styles.achievementCard}>
+            <Text style={styles.achievementText}>🏅 {badge}</Text>
+          </View>
+        ))
+      ) : (
+        <View style={styles.achievementCard}>
+          <Text style={styles.achievementText}>
+            No achievements unlocked yet.
+          </Text>
+        </View>
+      )}
 
-      <View style={styles.achievementCard}>
-        <Text style={styles.achievementText}>🤝 Collaborative Learner</Text>
-      </View>
+      {nextAchievement && (
+        <View style={styles.nextAchievementCard}>
+          <Text style={styles.nextAchievementTitle}>🏆 Next Achievement</Text>
+
+          <Text style={styles.nextAchievementName}>
+            {nextAchievement.title}
+          </Text>
+
+          <Text style={styles.nextAchievementMessage}>
+            {nextAchievement.message}
+          </Text>
+
+          <View style={styles.achievementProgressBar}>
+            <View
+              style={[
+                styles.achievementProgressFill,
+                {
+                  width: `${Math.min(
+                    (nextAchievement.progress / nextAchievement.target) * 100,
+                    100,
+                  )}%`,
+                },
+              ]}
+            />
+          </View>
+
+          <Text style={styles.nextAchievementReward}>
+            Reward: {nextAchievement.reward}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Study Insights</Text>
@@ -202,7 +362,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
     padding: 24,
-    paddingTop: 20,
+    paddingTop: 60,
   },
   center: {
     flex: 1,
@@ -281,5 +441,227 @@ const styles = StyleSheet.create({
   achievementText: {
     fontWeight: "bold",
     color: "#333",
+  },
+
+  weeklyReportCard: {
+    backgroundColor: "#F8F5FF",
+    borderRadius: 22,
+    padding: 20,
+    marginTop: 24,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  weeklyReportTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#6D28D9",
+    marginBottom: 16,
+  },
+
+  reportRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  reportLabel: {
+    color: "#6B7280",
+    fontWeight: "600",
+  },
+
+  reportValue: {
+    color: "#8B5CF6",
+    fontWeight: "bold",
+  },
+
+  reportDivider: {
+    height: 1,
+    backgroundColor: "#DDD6FE",
+    marginVertical: 14,
+  },
+
+  reportSectionTitle: {
+    fontWeight: "bold",
+    color: "#6D28D9",
+    marginBottom: 6,
+    marginTop: 8,
+  },
+
+  reportText: {
+    color: "#4B5563",
+    lineHeight: 20,
+  },
+
+  forecastCard: {
+    backgroundColor: "#F8F5FF",
+    borderRadius: 22,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  forecastTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#6D28D9",
+  },
+
+  forecastSubtitle: {
+    color: "#6B7280",
+    marginTop: 6,
+    marginBottom: 16,
+  },
+
+  forecastGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  forecastItem: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 12,
+    alignItems: "center",
+  },
+
+  forecastValue: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#8B5CF6",
+  },
+
+  forecastLabel: {
+    fontSize: 11,
+    color: "#6B7280",
+    marginTop: 5,
+    textAlign: "center",
+  },
+
+  forecastStatusBox: {
+    backgroundColor: "#EDE9FE",
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 16,
+  },
+
+  forecastStatusLabel: {
+    color: "#6B7280",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+
+  forecastStatusValue: {
+    color: "#6D28D9",
+    fontWeight: "bold",
+    fontSize: 16,
+    marginTop: 4,
+  },
+
+  aiSummaryCard: {
+    backgroundColor: "#F8F5FF",
+    borderRadius: 22,
+    padding: 20,
+    marginBottom: 24,
+
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  aiSummaryTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#6D28D9",
+    marginBottom: 14,
+  },
+
+  aiSummaryText: {
+    color: "#4B5563",
+    lineHeight: 24,
+    fontSize: 15,
+  },
+
+  nextAchievementCard: {
+    backgroundColor: "#F8F5FF",
+    borderRadius: 22,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  nextAchievementTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#6D28D9",
+    marginBottom: 12,
+  },
+
+  nextAchievementName: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#111827",
+  },
+
+  nextAchievementMessage: {
+    color: "#4B5563",
+    marginTop: 8,
+    lineHeight: 20,
+  },
+
+  achievementProgressBar: {
+    height: 8,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 999,
+    marginTop: 14,
+    overflow: "hidden",
+  },
+
+  achievementProgressFill: {
+    height: 8,
+    backgroundColor: "#8B5CF6",
+    borderRadius: 999,
+  },
+
+  nextAchievementReward: {
+    color: "#6D28D9",
+    fontWeight: "bold",
+    marginTop: 10,
+  },
+
+  breakdownCard: {
+    backgroundColor: "#F8F5FF",
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 24,
   },
 });

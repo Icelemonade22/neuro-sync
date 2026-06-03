@@ -1,9 +1,13 @@
+import { auth } from "@/config/firebase";
+import { getUserProfile } from "@/src/services/getUserProfile";
+import { saveWeeklyChampion } from "@/src/services/hallOfFameService";
 import { getLeaderboardUsers } from "@/src/services/leaderboardService";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -14,6 +18,8 @@ import { Text } from "react-native-paper";
 export default function LeaderboardScreen() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const currentUserId = auth.currentUser?.uid;
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadLeaderboard();
@@ -22,7 +28,30 @@ export default function LeaderboardScreen() {
   const loadLeaderboard = async () => {
     const data = await getLeaderboardUsers();
     setUsers(data);
+
+    const currentUser = auth.currentUser;
+
+    if (currentUser) {
+      const profile = await getUserProfile(currentUser.uid);
+      setIsAdmin(profile?.role === "admin");
+    }
+
     setLoading(false);
+  };
+
+  const handleSaveChampion = async () => {
+    if (!users[0]) {
+      Alert.alert("No Champion", "There is no weekly champion to save yet.");
+      return;
+    }
+
+    try {
+      await saveWeeklyChampion(users[0]);
+      Alert.alert("Saved", "Weekly champion saved to Hall of Fame.");
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Error", "Failed to save weekly champion.");
+    }
   };
 
   if (loading) {
@@ -50,6 +79,22 @@ export default function LeaderboardScreen() {
         Compete with friends through weekly study XP.
       </Text>
 
+      <TouchableOpacity
+        style={styles.hallOfFameButton}
+        onPress={() => router.push("/hallOfFame" as any)}
+      >
+        <Text style={styles.hallOfFameButtonText}>🏆 View Hall of Fame</Text>
+      </TouchableOpacity>
+
+      {isAdmin && (
+        <TouchableOpacity
+          style={styles.saveChampionButton}
+          onPress={handleSaveChampion}
+        >
+          <Text style={styles.saveChampionText}>⭐ Save Weekly Champion</Text>
+        </TouchableOpacity>
+      )}
+
       <View style={styles.topCard}>
         <Text style={styles.topTitle}>🏆 Weekly Champion</Text>
         <Text style={styles.topName}>{users[0]?.fullName ?? "No data"}</Text>
@@ -64,6 +109,7 @@ export default function LeaderboardScreen() {
             index === 0 && styles.goldCard,
             index === 1 && styles.silverCard,
             index === 2 && styles.bronzeCard,
+            user.id === currentUserId && styles.myCard,
           ]}
         >
           <Text style={styles.rank}>
@@ -83,7 +129,13 @@ export default function LeaderboardScreen() {
           </View>
 
           <View style={styles.info}>
-            <Text style={styles.name}>{user.fullName ?? "Student"}</Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.name}>{user.fullName ?? "Student"}</Text>
+
+              {user.id === currentUserId && (
+                <Text style={styles.youBadge}>You</Text>
+              )}
+            </View>
 
             <Text style={styles.detail}>
               Level {user.level ?? 1} • {user.weeklyXp ?? 0} weekly XP
@@ -222,5 +274,55 @@ const styles = StyleSheet.create({
     backgroundColor: "#FDF2E9",
     borderWidth: 1,
     borderColor: "#FB923C",
+  },
+
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  youBadge: {
+    backgroundColor: "#8B5CF6",
+    color: "#FFFFFF",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    fontSize: 10,
+    fontWeight: "bold",
+    overflow: "hidden",
+  },
+
+  myCard: {
+    borderWidth: 2,
+    borderColor: "#8B5CF6",
+  },
+
+  hallOfFameButton: {
+    backgroundColor: "#F3E8FF",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+    marginBottom: 20,
+  },
+
+  hallOfFameButtonText: {
+    color: "#8B5CF6",
+    fontWeight: "bold",
+  },
+
+  saveChampionButton: {
+    backgroundColor: "#8B5CF6",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    alignSelf: "flex-start",
+    marginBottom: 20,
+  },
+
+  saveChampionText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
   },
 });

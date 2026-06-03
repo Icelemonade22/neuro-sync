@@ -1,6 +1,7 @@
 import { useAuth } from "@/config/auth-context";
 import { auth } from "@/config/firebase";
 import { getUserProfile } from "@/src/services/getUserProfile";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { useCallback, useState } from "react";
@@ -81,11 +82,22 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 50 }}
+      contentContainerStyle={{ paddingBottom: 240 }}
     >
-      <Text style={styles.title}>Profile</Text>
+      <LinearGradient
+        colors={["#8B5CF6", "#A78BFA"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradientHeader}
+      >
+        <Text style={styles.gradientTitle}>Profile</Text>
 
-      <View style={styles.card}>
+        <Text style={styles.gradientSubtitle}>
+          Manage your study identity and productivity journey.
+        </Text>
+      </LinearGradient>
+
+      <View style={[styles.card, styles.cardShadow]}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
             {profile?.fullName?.charAt(0) ?? "S"}
@@ -105,15 +117,15 @@ export default function ProfileScreen() {
 
       <Button
         mode="contained"
-        style={styles.logoutButton}
+        style={styles.primaryButton}
         onPress={() => router.push("/editProfile")}
       >
         Edit Profile
       </Button>
 
-      <Text style={styles.sectionTitle}>Study Preferences</Text>
+      <Text style={styles.sectionTitle}>📘 Study Preferences</Text>
 
-      <View style={styles.card}>
+      <View style={[styles.card, styles.cardShadow]}>
         <Text style={styles.detail}>
           Session Type: {profile?.studyPreferences?.sessionType ?? "Pomodoro"}
         </Text>
@@ -126,9 +138,9 @@ export default function ProfileScreen() {
         </Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Goals</Text>
+      <Text style={styles.sectionTitle}>🎯 Goals</Text>
 
-      <View style={styles.card}>
+      <View style={[styles.card, styles.cardShadow]}>
         <Text style={styles.detail}>
           Daily Goal: {profile?.studyGoals?.dailyStudyMinutes ?? 0} minutes
         </Text>
@@ -140,9 +152,9 @@ export default function ProfileScreen() {
         </Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Gamification</Text>
+      <Text style={styles.sectionTitle}>🏆 Gamification</Text>
 
-      <View style={styles.card}>
+      <View style={[styles.card, styles.cardShadow]}>
         <Text style={styles.levelTitle}>Level {profile?.level ?? 1}</Text>
 
         <Text style={styles.xpText}>{profile?.xp ?? 0} XP</Text>
@@ -172,7 +184,10 @@ export default function ProfileScreen() {
 
       <Button
         mode="contained"
-        style={styles.logoutButton}
+        icon="robot-excited"
+        style={styles.primaryButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.primaryButtonLabel}
         onPress={() => router.push("/assistant")}
       >
         Open Study Assistant
@@ -180,7 +195,10 @@ export default function ProfileScreen() {
 
       <Button
         mode="outlined"
-        style={styles.button}
+        icon="book-open-page-variant"
+        style={styles.secondaryButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.secondaryButtonLabel}
         onPress={() => router.push("/(tabs)/notes")}
       >
         Study Notes
@@ -188,7 +206,10 @@ export default function ProfileScreen() {
 
       <Button
         mode="outlined"
-        style={styles.button}
+        icon="trophy-outline"
+        style={styles.secondaryButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.secondaryButtonLabel}
         onPress={() => router.push("/leaderboard")}
       >
         View Leaderboard
@@ -196,7 +217,10 @@ export default function ProfileScreen() {
 
       <Button
         mode="outlined"
-        style={styles.button}
+        icon="target"
+        style={styles.secondaryButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.secondaryButtonLabel}
         onPress={() => router.push("/dailyMissions")}
       >
         Daily Missions
@@ -205,7 +229,10 @@ export default function ProfileScreen() {
       {profile?.role === "admin" && (
         <Button
           mode="contained"
-          style={styles.button}
+          icon="shield-crown-outline"
+          style={styles.primaryButton}
+          contentStyle={styles.buttonContent}
+          labelStyle={styles.primaryButtonLabel}
           onPress={() => router.push("/admin" as any)}
         >
           Admin Dashboard
@@ -214,15 +241,32 @@ export default function ProfileScreen() {
 
       <Button
         mode="outlined"
-        style={styles.button}
+        icon="lock-reset"
+        style={styles.secondaryButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.secondaryButtonLabel}
         onPress={handleResetPassword}
       >
         Send Password Reset Email
       </Button>
 
       <Button
+        mode="outlined"
+        icon="message-alert-outline"
+        style={styles.secondaryButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.secondaryButtonLabel}
+        onPress={() => router.push("/feedback" as any)}
+      >
+        Feedback & Reports
+      </Button>
+
+      <Button
         mode="contained"
-        style={styles.logoutButton}
+        icon="logout"
+        style={styles.dangerButton}
+        contentStyle={styles.buttonContent}
+        labelStyle={styles.dangerButtonLabel}
         onPress={handleLogout}
       >
         Logout
@@ -235,7 +279,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
-    paddingTop: 30,
+    paddingTop: 60,
     backgroundColor: "#FFFFFF",
   },
   center: {
@@ -255,7 +299,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#F8F5FF",
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 18,
   },
   name: {
@@ -270,10 +314,6 @@ const styles = StyleSheet.create({
   detail: {
     color: "#555",
     marginTop: 8,
-  },
-  button: {
-    marginTop: 28,
-    borderRadius: 20,
   },
   logoutButton: {
     marginTop: 14,
@@ -338,5 +378,91 @@ const styles = StyleSheet.create({
     color: "#777",
     fontSize: 12,
     marginBottom: 12,
+  },
+
+  primaryButton: {
+    borderRadius: 20,
+    marginTop: 18,
+    backgroundColor: "#8B5CF6",
+    elevation: 4,
+  },
+
+  secondaryButton: {
+    borderRadius: 20,
+    marginTop: 14,
+    borderColor: "#8B5CF6",
+    borderWidth: 1.5,
+    backgroundColor: "#FFFFFF",
+  },
+
+  dangerButton: {
+    borderRadius: 20,
+    marginTop: 18,
+    backgroundColor: "#EF4444",
+    elevation: 4,
+  },
+
+  buttonContent: {
+    paddingVertical: 8,
+  },
+
+  primaryButtonLabel: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+
+  secondaryButtonLabel: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#8B5CF6",
+  },
+
+  dangerButtonLabel: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+
+  cardShadow: {
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+
+  gradientHeader: {
+    borderRadius: 28,
+    paddingTop: 36,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    marginBottom: 20,
+    shadowColor: "#8B5CF6",
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 6,
+    borderBottomLeftRadius: 36,
+    borderBottomRightRadius: 36,
+  },
+
+  gradientTitle: {
+    fontSize: 30,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+
+  gradientSubtitle: {
+    color: "#EDE9FE",
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
   },
 });

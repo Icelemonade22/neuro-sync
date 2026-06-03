@@ -52,7 +52,13 @@ import {
   signOut,
   User,
 } from "firebase/auth";
-import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "./firebase";
 
@@ -76,10 +82,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(currentUser);
 
       if (currentUser) {
-        await updateDoc(doc(db, "users", currentUser.uid), {
-          online: true,
-          lastActive: serverTimestamp(),
-        });
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+          await updateDoc(userRef, {
+            online: true,
+            lastActive: serverTimestamp(),
+          });
+        } else {
+          await setDoc(
+            userRef,
+            {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              online: true,
+              lastActive: serverTimestamp(),
+            },
+            { merge: true },
+          );
+        }
       }
 
       setLoading(false);
@@ -110,10 +132,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     if (auth.currentUser) {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
-        online: false,
-        lastActive: serverTimestamp(),
-      });
+      await setDoc(
+        doc(db, "users", auth.currentUser.uid),
+        {
+          online: false,
+          lastActive: serverTimestamp(),
+        },
+        { merge: true },
+      );
     }
 
     await signOut(auth);

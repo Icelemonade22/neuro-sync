@@ -16,6 +16,30 @@ const isValidEmail = (email: string) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 };
 
+const getFriendlyAuthError = (message: string) => {
+  if (message.includes("auth/invalid-credential")) {
+    return "Incorrect email or password. Please try again.";
+  }
+
+  if (message.includes("auth/user-not-found")) {
+    return "No account found with this email.";
+  }
+
+  if (message.includes("auth/wrong-password")) {
+    return "Incorrect password. Please try again.";
+  }
+
+  if (message.includes("auth/email-already-in-use")) {
+    return "This email is already registered. Please sign in instead.";
+  }
+
+  if (message.includes("auth/too-many-requests")) {
+    return "Too many attempts. Please wait a while and try again.";
+  }
+
+  return "Something went wrong. Please try again.";
+};
+
 export default function AuthScreen() {
   const [isSignUp, setIsSignUp] = useState<boolean>(false);
   const [email, setEmail] = useState<string>("");
@@ -49,7 +73,7 @@ export default function AuthScreen() {
     if (isSignUp) {
       const error = await signUp(email.trim(), password);
       if (error) {
-        setError(error);
+        setError(getFriendlyAuthError(error));
         return;
       }
       Alert.alert(
@@ -70,7 +94,7 @@ export default function AuthScreen() {
     } else {
       const error = await signIn(email.trim(), password);
       if (error) {
-        setError(error);
+        setError(getFriendlyAuthError(error));
         return;
       }
 
@@ -102,7 +126,7 @@ export default function AuthScreen() {
     const error = await resetPassword(email.trim().toLowerCase());
 
     if (error) {
-      setError(error);
+      setError(getFriendlyAuthError(error));
       return;
     }
 

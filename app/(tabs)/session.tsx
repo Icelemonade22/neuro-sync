@@ -8,6 +8,7 @@ import {
   unlockBadge,
   updateStudyStreak,
 } from "@/src/services/gamificationService";
+import { getUserProfile } from "@/src/services/getUserProfile";
 import { router } from "expo-router";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useEffect, useState } from "react";
@@ -20,19 +21,49 @@ import {
 } from "react-native";
 import { Button, Text } from "react-native-paper";
 
-const SESSION_DURATION = 30;
+const TEST_MODE = true; // Set to false for production (25/60 min sessions)
 
 export default function SessionScreen() {
-  const [secondsLeft, setSecondsLeft] = useState(SESSION_DURATION);
+  const [sessionDuration, setSessionDuration] = useState(30);
+  const [secondsLeft, setSecondsLeft] = useState(30);
+  const [sessionType, setSessionType] = useState("Pomodoro");
   const [isRunning, setIsRunning] = useState(false);
 
   const [achievementVisible, setAchievementVisible] = useState(false);
   const [savingSession, setSavingSession] = useState(false);
 
+  const [modalHeading, setModalHeading] = useState("Session Completed!");
+  const [modalEmoji, setModalEmoji] = useState("✅");
+
   const [achievementData, setAchievementData] = useState({
     title: "",
     xp: 0,
   });
+
+  useEffect(() => {
+    const loadSessionPreference = async () => {
+      const user = auth.currentUser;
+
+      if (!user) return;
+
+      const profile = await getUserProfile(user.uid);
+
+      const preferredSessionType =
+        profile?.studyPreferences?.sessionType ?? "Pomodoro";
+
+      const duration = TEST_MODE
+        ? 30
+        : preferredSessionType === "Long Session"
+          ? 60 * 60
+          : 25 * 60;
+
+      setSessionType(preferredSessionType);
+      setSessionDuration(duration);
+      setSecondsLeft(duration);
+    };
+
+    loadSessionPreference();
+  }, []);
 
   useEffect(() => {
     if (!isRunning || secondsLeft <= 0) return;
@@ -48,7 +79,7 @@ export default function SessionScreen() {
     if (secondsLeft === 0 && isRunning) {
       setIsRunning(false);
       completeSession();
-      setSecondsLeft(SESSION_DURATION);
+      setSecondsLeft(sessionDuration);
     }
   }, [secondsLeft, isRunning]);
 
@@ -75,8 +106,13 @@ export default function SessionScreen() {
     try {
       await addDoc(collection(db, "studySessions"), {
         userId: user.uid,
-        sessionType: "Pomodoro",
-        durationMinutes: 25,
+        sessionType: sessionType,
+        //durationMinutes: sessionDuration / 60,
+        durationMinutes: TEST_MODE
+          ? sessionType === "Long Session"
+            ? 60
+            : 25
+          : sessionDuration / 60,
         completed: true,
         createdAt: serverTimestamp(),
       });
@@ -89,13 +125,27 @@ export default function SessionScreen() {
 
       await awardUserXP(user.uid, earnedXp);
 
-      await completeMission("study");
+      const missionCompleted = await completeMission("study");
 
       const unlocked = await unlockBadge(user.uid, "First Focus Session");
 
+      setModalHeading(
+        missionCompleted
+          ? "Mission Completed!"
+          : unlocked
+            ? "Achievement Unlocked!"
+            : "Session Completed!",
+      );
+
+      setModalEmoji(missionCompleted ? "🎯" : unlocked ? "🎉" : "✅");
+
       setAchievementData({
-        title: unlocked ? "First Focus Session" : "Focus Session Completed",
-        xp: earnedXp,
+        title: missionCompleted
+          ? "Complete 1 Focus Session Mission Completed"
+          : unlocked
+            ? "First Focus Session"
+            : "Focus Session Completed",
+        xp: missionCompleted ? 30 : earnedXp,
       });
 
       setAchievementVisible(true);
@@ -109,7 +159,7 @@ export default function SessionScreen() {
 
   const resetSession = () => {
     setIsRunning(false);
-    setSecondsLeft(SESSION_DURATION);
+    setSecondsLeft(sessionDuration);
   };
 
   return (
@@ -119,7 +169,7 @@ export default function SessionScreen() {
       showsVerticalScrollIndicator={false}
     >
       <Text style={styles.title}>Focus Session</Text>
-      <Text style={styles.subtitle}>Pomodoro Mode</Text>
+      <Text style={styles.subtitle}>{sessionType} Mode</Text>
 
       <View style={styles.timerCircle}>
         <Text style={styles.timerText}>{formatTime(secondsLeft)}</Text>
@@ -192,6 +242,8 @@ export default function SessionScreen() {
 
       <AchievementModal
         visible={achievementVisible}
+        heading={modalHeading}
+        emoji={modalEmoji}
         title={achievementData.title}
         xp={achievementData.xp}
         onClose={() => {
@@ -211,8 +263,8 @@ const styles = StyleSheet.create({
 
   content: {
     padding: 24,
-    paddingTop: 30,
-    paddingBottom: 120,
+    paddingTop: 60,
+    paddingBottom: 180,
   },
 
   title: {

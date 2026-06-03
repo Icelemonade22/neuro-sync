@@ -1,13 +1,17 @@
 import { auth } from "@/config/firebase";
 import { getUserProfile } from "@/src/services/getUserProfile";
 import { getUserSessions } from "@/src/services/getUserSessions";
-import { generateSmartRecommendation } from "@/src/services/recommendationService";
+import {
+  listenUnreadNotificationCount
+} from "@/src/services/notificationCenterService";
 import { getUserActiveRoom } from "@/src/services/roomService";
+import { calculateAnalytics } from "@/src/utils/calculateAnalytics";
 import { calculateTodayMinutes } from "@/src/utils/calculateTodayMinutes";
 import { detectBurnout } from "@/src/utils/detectBurnout";
 import { generateStudyRecommendation } from "@/src/utils/generateStudyRecommendation";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -24,6 +28,8 @@ export default function DashboardScreen() {
   const [recommendation, setRecommendation] = useState<any>(null);
   const [burnoutWarning, setBurnoutWarning] = useState<any>(null);
   const [activeRoom, setActiveRoom] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const loadProfile = async () => {
     const user = auth.currentUser;
@@ -37,6 +43,8 @@ export default function DashboardScreen() {
     setProfile(data);
 
     const sessions = await getUserSessions(user.uid);
+    const analyticsResult = calculateAnalytics(sessions);
+    setAnalytics(analyticsResult);
     const minutesToday = calculateTodayMinutes(sessions);
 
     setTodayMinutes(minutesToday);
@@ -44,7 +52,13 @@ export default function DashboardScreen() {
     const burnout = detectBurnout(sessions);
     setBurnoutWarning(burnout);
 
-    const smartRecommendation = generateStudyRecommendation(data, sessions);
+    const smartRecommendation = generateStudyRecommendation(
+      data,
+      sessions,
+      analyticsResult,
+      minutesToday,
+      burnout,
+    );
     setRecommendation(smartRecommendation);
 
     const room = await getUserActiveRoom();
@@ -58,6 +72,16 @@ export default function DashboardScreen() {
       loadProfile();
     }, []),
   );
+
+  useEffect(() => {
+    const user = auth.currentUser;
+
+    if (!user) return;
+
+    const unsubscribe = listenUnreadNotificationCount(user.uid, setUnreadCount);
+
+    return unsubscribe;
+  }, []);
 
   if (loading) {
     return (
@@ -78,32 +102,61 @@ export default function DashboardScreen() {
   const xp = profile?.xp ?? 0;
   const level = profile?.level ?? 1;
   const badges = profile?.badges ?? [];
-  const smartRecommendation = generateSmartRecommendation(profile);
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 180 }}
+    >
       <View style={styles.container}>
-        <Text style={styles.greeting}>Hi {firstName} 👋</Text>
+        <TouchableOpacity
+          style={styles.notificationButton}
+          onPress={() => router.push("/notifications")}
+        >
+          <Text style={styles.notificationButtonText}>🔔 Notifications</Text>
 
-        <View style={styles.aiCard}>
-          <Text style={styles.aiTitle}>{smartRecommendation.title}</Text>
+          {unreadCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeTextNumber}>{unreadCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
-          <Text style={styles.aiMessage}>{smartRecommendation.message}</Text>
-        </View>
+        <LinearGradient
+          colors={["#8B5CF6", "#A78BFA"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroCard}
+        >
+          <Text style={styles.heroGreeting}>Hi {firstName} 👋</Text>
 
-        <Text style={styles.levelText}>
-          Level {level} • {xp} XP
-        </Text>
+          <Text style={styles.heroRecommendationTitle}>
+            {recommendation?.title}
+          </Text>
 
-        {badges.length > 0 && (
-          <Text style={styles.badgeText}>🏅 {badges[0]}</Text>
-        )}
+          <Text style={styles.heroRecommendationMessage}>
+            {recommendation?.message}
+          </Text>
 
-        <Text style={styles.streak}>🔥 {profile?.streak ?? 0}-day streak</Text>
+          <View style={styles.heroDivider} />
 
-        <Text style={styles.smallText}>
-          Best streak: {profile?.longestStreak ?? 0} days
-        </Text>
+          <View style={styles.heroStatsRow}>
+            <Text style={styles.heroStat}>Level {level}</Text>
+            <Text style={styles.heroStat}>{xp} XP</Text>
+            <Text style={styles.heroStat}>
+              🔥 {profile?.streak ?? 0}-day streak
+            </Text>
+          </View>
+
+          {badges.length > 0 && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeChip}>🏅 {badges[0]}</Text>
+            </View>
+          )}
+          <Text style={styles.heroSmallText}>
+            Best streak: {profile?.longestStreak ?? 0} days
+          </Text>
+        </LinearGradient>
 
         {burnoutWarning && (
           <View style={styles.burnoutCard}>
@@ -113,7 +166,7 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        <View style={styles.card}>
+        <View style={[styles.card, styles.cardShadow]}>
           <View style={styles.row}>
             <Text style={styles.cardLabel}>NEXT SESSION</Text>
             <Text style={styles.time}>
@@ -123,7 +176,7 @@ export default function DashboardScreen() {
 
           <Text style={styles.subject}>{subject}</Text>
           <Text style={styles.smallText}>
-            Recommended based on your study preferences
+            Best subject based on recent study activity
           </Text>
         </View>
 
@@ -138,7 +191,7 @@ export default function DashboardScreen() {
           </Text>
         </TouchableOpacity>
 
-        <View style={styles.card}>
+        <View style={[styles.card, styles.cardShadow]}>
           <View style={styles.row}>
             <Text style={styles.cardLabel}>TODAY'S GOAL</Text>
             <Text style={styles.check}>✅</Text>
@@ -166,7 +219,7 @@ export default function DashboardScreen() {
 
         <Text style={styles.sectionTitle}>Your Study Buddy</Text>
 
-        <View style={styles.card}>
+        <View style={[styles.card, styles.cardShadow]}>
           {activeRoom ? (
             <>
               <Text style={styles.subject}>Active Study Room</Text>
@@ -208,9 +261,29 @@ export default function DashboardScreen() {
         <Text style={styles.sectionTitle}>Your Progress</Text>
 
         <View style={styles.statsRow}>
-          <StatBox value="24.5" label="Hours" sub="+12% this week" />
-          <StatBox value="15" label="Sessions" sub="+3 today" />
-          <StatBox value="79" label="Focus Score" sub="Excellent" />
+          <StatBox
+            value={`${analytics?.totalHours ?? 0}`}
+            label="Hours"
+            sub="Total study time"
+          />
+
+          <StatBox
+            value={`${analytics?.totalSessions ?? 0}`}
+            label="Sessions"
+            sub="Completed"
+          />
+
+          <StatBox
+            value={`${analytics?.focusScore ?? 0}`}
+            label="Focus Score"
+            sub={
+              (analytics?.focusScore ?? 0) >= 80
+                ? "Excellent"
+                : (analytics?.focusScore ?? 0) >= 60
+                  ? "Good"
+                  : "Improving"
+            }
+          />
         </View>
       </View>
     </ScrollView>
@@ -240,7 +313,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
     padding: 24,
-    paddingTop: 20,
+    paddingTop: 60,
   },
   center: {
     flex: 1,
@@ -438,5 +511,134 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 13,
     fontWeight: "600",
+  },
+  cardShadow: {
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  heroCard: {
+    borderRadius: 30,
+    paddingTop: 28,
+    paddingHorizontal: 22,
+    paddingBottom: 20,
+    marginBottom: 22,
+    shadowColor: "#8B5CF6",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+
+  heroGreeting: {
+    color: "#FFFFFF",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+
+  heroRecommendationTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+
+  heroRecommendationMessage: {
+    color: "#EDE9FE",
+    lineHeight: 21,
+    marginBottom: 18,
+  },
+
+  heroStatsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+
+  heroStat: {
+    flex: 1,
+    marginHorizontal: 4,
+    textAlign: "center",
+    backgroundColor: "rgba(255,255,255,0.22)",
+    color: "#FFFFFF",
+    paddingVertical: 6,
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: "bold",
+    overflow: "hidden",
+  },
+
+  heroBadge: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    marginTop: 2,
+    marginBottom: 6,
+  },
+
+  heroSmallText: {
+    color: "#EDE9FE",
+    fontSize: 12,
+  },
+
+  heroDivider: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    marginVertical: 12,
+  },
+
+  badgeContainer: {
+    marginTop: 8,
+    marginBottom: 6,
+  },
+
+  badgeChip: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    color: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  notificationButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-end",
+    backgroundColor: "#F3E8FF",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    gap: 8,
+  },
+
+  badge: {
+    backgroundColor: "#EF4444",
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  badgeTextNumber: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "bold",
+    lineHeight: 12,
+  },
+
+  notificationButtonText: {
+    color: "#8B5CF6",
+    fontWeight: "bold",
+    fontSize: 13,
   },
 });
