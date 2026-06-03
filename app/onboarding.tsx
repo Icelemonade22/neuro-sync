@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 24,
-    paddingBottom: 50,
+    paddingBottom: 90,
   },
   step: {
     textAlign: "right",

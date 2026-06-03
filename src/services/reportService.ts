@@ -26,6 +26,7 @@ export async function createReport(data: {
   title: string;
   description: string;
   reportedBy: string;
+  reasons?: string[];
   relatedItemId?: string;
   relatedItemType?: "note" | "room" | "user" | "general";
 }) {

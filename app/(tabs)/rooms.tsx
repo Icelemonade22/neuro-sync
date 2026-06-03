@@ -1,15 +1,15 @@
 import { auth } from "@/config/firebase";
-import { createReport } from "@/src/services/reportService";
 import { getUserStudyRooms } from "@/src/services/studyRoomService";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator, Alert, ScrollView,
+  ActivityIndicator,
+  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View
 } from "react-native";
-import { Button, Text } from "react-native-paper";
+import { Text } from "react-native-paper";
 
 export default function RoomsScreen() {
   const [rooms, setRooms] = useState<any[]>([]);
@@ -22,35 +22,6 @@ export default function RoomsScreen() {
     const data = await getUserStudyRooms(user.uid);
     setRooms(data);
     setLoading(false);
-  };
-
-  const handleReportRoom = async (room: any) => {
-    const user = auth.currentUser;
-
-    if (!user) {
-      Alert.alert("Error", "You must be logged in to report a room.");
-      return;
-    }
-
-    try {
-      await createReport({
-        type: "Inappropriate Content",
-        title: `Reported Room: ${room.name ?? room.title ?? "Study Room"}`,
-        description: `The study room "${
-          room.name ?? room.title ?? "Study Room"
-        }" was reported by a user.`,
-        reportedBy: user.email ?? "Student",
-        relatedItemId: room.id,
-        relatedItemType: "room",
-      });
-
-      Alert.alert(
-        "Reported",
-        "This study room has been reported to the admin.",
-      );
-    } catch (error: any) {
-      Alert.alert("Error", error?.message ?? "Failed to report room.");
-    }
   };
 
   useEffect(() => {
@@ -91,13 +62,6 @@ export default function RoomsScreen() {
             >
               <Text style={styles.buttonText}>Join Room</Text>
             </TouchableOpacity>
-            <Button
-              mode="text"
-              textColor="#EF4444"
-              onPress={() => handleReportRoom(room)}
-            >
-              Report Room
-            </Button>
           </View>
         ))
       )}

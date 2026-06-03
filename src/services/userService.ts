@@ -66,6 +66,7 @@ export async function saveOnboardingData(data: OnboardingData) {
       longestStreak: 0,
       badges: [],
       online: true,
+      warningCount: 0,
 
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),

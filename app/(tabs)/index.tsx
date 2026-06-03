@@ -1,9 +1,7 @@
 import { auth } from "@/config/firebase";
 import { getUserProfile } from "@/src/services/getUserProfile";
 import { getUserSessions } from "@/src/services/getUserSessions";
-import {
-  listenUnreadNotificationCount
-} from "@/src/services/notificationCenterService";
+import { listenUnreadNotificationCount } from "@/src/services/notificationCenterService";
 import { getUserActiveRoom } from "@/src/services/roomService";
 import { calculateAnalytics } from "@/src/utils/calculateAnalytics";
 import { calculateTodayMinutes } from "@/src/utils/calculateTodayMinutes";
@@ -157,6 +155,22 @@ export default function DashboardScreen() {
             Best streak: {profile?.longestStreak ?? 0} days
           </Text>
         </LinearGradient>
+
+        <View style={styles.communityCard}>
+          <Text style={styles.communityTitle}>Community Standing</Text>
+
+          <Text style={styles.communityStatus}>
+            {(profile?.warningCount ?? 0) >= 3
+              ? "🔴 Community Warning"
+              : (profile?.warningCount ?? 0) >= 1
+                ? "🟡 Under Review"
+                : "🟢 Good Standing"}
+          </Text>
+
+          <Text style={styles.communityText}>
+            Warnings: {profile?.warningCount ?? 0}
+          </Text>
+        </View>
 
         {burnoutWarning && (
           <View style={styles.burnoutCard}>
@@ -640,5 +654,35 @@ const styles = StyleSheet.create({
     color: "#8B5CF6",
     fontWeight: "bold",
     fontSize: 13,
+  },
+
+  communityCard: {
+    backgroundColor: "#FFFFFF",
+    padding: 18,
+    borderRadius: 18,
+    marginTop: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+
+  communityTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#111827",
+  },
+
+  communityStatus: {
+    marginTop: 8,
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  communityText: {
+    marginTop: 6,
+    color: "#6B7280",
   },
 });

@@ -1,11 +1,14 @@
+import { db } from "@/config/firebase";
 import {
   deleteReport,
   listenReports,
   updateReportPriority,
   updateReportStatus,
 } from "@/src/services/reportService";
+import { issueUserWarning } from "@/src/services/warningService";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -51,6 +54,34 @@ export default function AdminReportsScreen() {
         },
       ],
     );
+  };
+
+  const handleIssueWarning = async (report: any) => {
+    if (report.relatedItemType !== "user" || !report.relatedItemId) {
+      Alert.alert(
+        "Invalid Report",
+        "This warning can only be issued for user reports.",
+      );
+      return;
+    }
+
+    try {
+      await issueUserWarning({
+        userId: report.relatedItemId,
+        reportId: report.id,
+        message:
+          "Your account has received a warning after a report was reviewed by the administration team.",
+      });
+
+      await updateDoc(doc(db, "reports", report.id), {
+        warningIssued: true,
+        warningIssuedAt: serverTimestamp(),
+      });
+
+      Alert.alert("Warning Sent");
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   if (loading) {
@@ -135,55 +166,91 @@ export default function AdminReportsScreen() {
               <Text style={styles.meta}>Related: {report.relatedItemType}</Text>
             )}
 
-            <View style={styles.buttonRow}>
+            <Text style={styles.actionLabel}>Status</Text>
+
+            <View style={styles.actionRow}>
               <Button
-                mode="outlined"
+                mode={report.status === "In Review" ? "contained" : "outlined"}
                 compact
+                buttonColor={
+                  report.status === "In Review" ? "#1645c8" : undefined
+                }
+                textColor={
+                  report.status === "In Review" ? "#FFFFFF" : "#6D28D9"
+                }
                 onPress={() => updateReportStatus(report.id, "In Review")}
               >
                 Review
               </Button>
 
               <Button
-                mode="outlined"
+                mode={report.status === "Resolved" ? "contained" : "outlined"}
                 compact
+                buttonColor={
+                  report.status === "Resolved" ? "#22C55E" : undefined
+                }
+                textColor={report.status === "Resolved" ? "#FFFFFF" : "#6D28D9"}
                 onPress={() => updateReportStatus(report.id, "Resolved")}
               >
                 Resolve
               </Button>
 
               <Button
-                mode="outlined"
+                mode={report.status === "Dismissed" ? "contained" : "outlined"}
                 compact
+                buttonColor={
+                  report.status === "Dismissed" ? "#9CA3AF" : undefined
+                }
+                textColor={
+                  report.status === "Dismissed" ? "#FFFFFF" : "#6D28D9"
+                }
                 onPress={() => updateReportStatus(report.id, "Dismissed")}
               >
                 Dismiss
               </Button>
-
-              <Button
-                mode="outlined"
-                compact
-                onPress={() => updateReportPriority(report.id, "Low")}
-              >
-                Low
-              </Button>
-
-              <Button
-                mode="outlined"
-                compact
-                onPress={() => updateReportPriority(report.id, "Medium")}
-              >
-                Medium
-              </Button>
-
-              <Button
-                mode="outlined"
-                compact
-                onPress={() => updateReportPriority(report.id, "High")}
-              >
-                High
-              </Button>
             </View>
+
+            <Text style={styles.actionLabel}>Priority</Text>
+
+            <View style={styles.actionRow}>
+              <Chip
+                selected={report.priority === "Low"}
+                onPress={() => updateReportPriority(report.id, "Low")}
+                style={styles.lowChip}
+              >
+                🟢 Low
+              </Chip>
+
+              <Chip
+                selected={report.priority === "Medium"}
+                onPress={() => updateReportPriority(report.id, "Medium")}
+                style={styles.mediumChip}
+              >
+                🟠 Medium
+              </Chip>
+
+              <Chip
+                selected={report.priority === "High"}
+                onPress={() => updateReportPriority(report.id, "High")}
+                style={styles.highChip}
+              >
+                🔴 High
+              </Chip>
+            </View>
+
+            {report.relatedItemType === "user" &&
+              report.status === "Resolved" && (
+                <Button
+                  mode="contained"
+                  compact
+                  buttonColor={report.warningIssued ? "#9CA3AF" : "#F59E0B"}
+                  disabled={report.warningIssued}
+                  style={styles.warnButton}
+                  onPress={() => handleIssueWarning(report)}
+                >
+                  {report.warningIssued ? "✓ Warning Sent" : "⚠ Warn User"}
+                </Button>
+              )}
 
             <Button
               mode="text"
@@ -308,5 +375,34 @@ const styles = StyleSheet.create({
   dismissed: {
     backgroundColor: "#F3F4F6",
     color: "#374151",
+  },
+  actionLabel: {
+    marginTop: 14,
+    marginBottom: 8,
+    fontWeight: "bold",
+    color: "#6B7280",
+  },
+
+  actionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  lowChip: {
+    backgroundColor: "#DCFCE7",
+  },
+
+  mediumChip: {
+    backgroundColor: "#FEF3C7",
+  },
+
+  highChip: {
+    backgroundColor: "#FEE2E2",
+  },
+
+  warnButton: {
+    marginTop: 16,
+    borderRadius: 999,
   },
 });

@@ -17,7 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Button, Text } from "react-native-paper";
+import { Button, Checkbox, Modal, Portal, Text } from "react-native-paper";
 
 export default function BuddiesScreen() {
   const [loading, setLoading] = useState(true);
@@ -25,6 +25,26 @@ export default function BuddiesScreen() {
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [sentRequestIds, setSentRequestIds] = useState<string[]>([]);
   const [connectedBuddyIds, setConnectedBuddyIds] = useState<string[]>([]);
+  const [currentProfile, setCurrentProfile] = useState<any>(null);
+  const [reportingUser, setReportingUser] = useState<any>(null);
+  const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
+
+  const userReportReasons = [
+    "Inappropriate behaviour",
+    "Harassment or rude language",
+    "Spam or repeated unwanted messages",
+    "Fake or misleading profile",
+    "Disruptive study behaviour",
+    "Other",
+  ];
+
+  const toggleReason = (reason: string) => {
+    setSelectedReasons((prev) =>
+      prev.includes(reason)
+        ? prev.filter((item) => item !== reason)
+        : [...prev, reason],
+    );
+  };
 
   useEffect(() => {
     loadMatches();
@@ -47,13 +67,14 @@ export default function BuddiesScreen() {
     setSentRequestIds(pendingIds);
     setConnectedBuddyIds(acceptedIds);
 
-    const currentProfile = await getUserProfile(user.uid);
+    const profile = await getUserProfile(user.uid);
+    setCurrentProfile(profile);
     const users = await getStudyBuddies(user.uid);
 
     const rankedMatches = users
       .map((otherUser: any) => ({
         ...otherUser,
-        compatibility: calculateCompatibility(currentProfile, otherUser),
+        compatibility: calculateCompatibility(profile, otherUser),
       }))
       .sort((a, b) => b.compatibility - a.compatibility);
 
@@ -68,7 +89,17 @@ export default function BuddiesScreen() {
     try {
       setConnectingId(buddy.id);
 
-      const currentProfile = await getUserProfile(user.uid);
+      const profile = await getUserProfile(user.uid);
+
+      setCurrentProfile(profile);
+
+      if ((currentProfile?.warningCount ?? 0) >= 3) {
+        Alert.alert(
+          "Restricted",
+          "Buddy matching is temporarily unavailable due to multiple warnings.",
+        );
+        return;
+      }
 
       const result = await sendBuddyRequest({
         fromUserId: user.uid,
@@ -103,19 +134,26 @@ export default function BuddiesScreen() {
       return;
     }
 
+    if (selectedReasons.length === 0) {
+      Alert.alert("Select Reason", "Please select at least one reason.");
+      return;
+    }
+
     try {
       await createReport({
         type: "User Report",
         title: `Reported User: ${buddy.fullName ?? buddy.email ?? "User"}`,
-        description: `The user "${
-          buddy.fullName ?? buddy.email ?? "User"
-        }" was reported by another user.`,
+        description: `Reasons: ${selectedReasons.join(", ")}`,
+        reasons: selectedReasons,
         reportedBy: user.email ?? "Student",
         relatedItemId: buddy.uid ?? buddy.id,
         relatedItemType: "user",
       });
 
       Alert.alert("Reported", "This user has been reported to the admin.");
+
+      setReportingUser(null);
+      setSelectedReasons([]);
     } catch (error: any) {
       Alert.alert("Error", error?.message ?? "Failed to report user.");
     }
@@ -132,7 +170,7 @@ export default function BuddiesScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 180 }}
+      contentContainerStyle={{ paddingBottom: 200 }}
     >
       <Text style={styles.title}>Find Study Buddy 🤝</Text>
       <Text style={styles.subtitle}>
@@ -210,30 +248,49 @@ export default function BuddiesScreen() {
               <TouchableOpacity
                 style={[
                   styles.button,
-                  (connectingId === buddy.id || alreadySent || connected) && {
+
+                  (connectingId === buddy.id ||
+                    alreadySent ||
+                    connected ||
+                    (currentProfile?.warningCount ?? 0) >= 3) && {
                     opacity: 0.6,
                   },
+
                   connected && {
                     backgroundColor: "#22C55E",
                   },
+
+                  (currentProfile?.warningCount ?? 0) >= 3 && {
+                    backgroundColor: "#EF4444",
+                  },
                 ]}
-                disabled={connectingId === buddy.id || alreadySent || connected}
+                disabled={
+                  connectingId === buddy.id ||
+                  alreadySent ||
+                  connected ||
+                  (currentProfile?.warningCount ?? 0) >= 3
+                }
                 onPress={() => handleConnect(buddy)}
               >
                 <Text style={styles.buttonText}>
-                  {connected
-                    ? "Connected ✅"
-                    : alreadySent
-                      ? "Request Sent"
-                      : connectingId === buddy.id
-                        ? "Sending..."
-                        : "Connect"}
+                  {(currentProfile?.warningCount ?? 0) >= 3
+                    ? "Restricted 🚫"
+                    : connected
+                      ? "Connected ✅"
+                      : alreadySent
+                        ? "Request Sent"
+                        : connectingId === buddy.id
+                          ? "Sending..."
+                          : "Connect"}
                 </Text>
               </TouchableOpacity>
               <Button
                 mode="text"
                 textColor="#EF4444"
-                onPress={() => handleReportUser(buddy)}
+                onPress={() => {
+                  setReportingUser(buddy);
+                  setSelectedReasons([]);
+                }}
               >
                 Report User
               </Button>
@@ -241,6 +298,50 @@ export default function BuddiesScreen() {
           );
         })
       )}
+      <Portal>
+        <Modal
+          visible={!!reportingUser}
+          onDismiss={() => {
+            setReportingUser(null);
+            setSelectedReasons([]);
+          }}
+          contentContainerStyle={styles.reportModal}
+        >
+          <Text style={styles.reportTitle}>
+            Report {reportingUser?.fullName ?? "User"}
+          </Text>
+
+          {userReportReasons.map((reason) => (
+            <Checkbox.Item
+              key={reason}
+              label={reason}
+              status={
+                selectedReasons.includes(reason) ? "checked" : "unchecked"
+              }
+              onPress={() => toggleReason(reason)}
+            />
+          ))}
+
+          <Button
+            mode="contained"
+            disabled={selectedReasons.length === 0}
+            onPress={() => handleReportUser(reportingUser)}
+            style={styles.submitReportButton}
+          >
+            Submit Report
+          </Button>
+
+          <Button
+            mode="text"
+            onPress={() => {
+              setReportingUser(null);
+              setSelectedReasons([]);
+            }}
+          >
+            Cancel
+          </Button>
+        </Modal>
+      </Portal>
     </ScrollView>
   );
 }
@@ -380,5 +481,31 @@ const styles = StyleSheet.create({
     color: "#8B5CF6",
     fontWeight: "bold",
     fontSize: 12,
+  },
+
+  reportBox: {
+    backgroundColor: "#F8F5FF",
+    padding: 18,
+    borderRadius: 18,
+    marginTop: 20,
+  },
+
+  reportTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+
+  reportModal: {
+    backgroundColor: "#FFFFFF",
+    padding: 22,
+    margin: 24,
+    borderRadius: 22,
+  },
+
+  submitReportButton: {
+    marginTop: 12,
+    borderRadius: 20,
+    backgroundColor: "#8B5CF6",
   },
 });

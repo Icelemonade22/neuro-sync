@@ -12,11 +12,56 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Button, Text } from "react-native-paper";
+import {
+  Button,
+  Checkbox,
+  Chip,
+  Modal,
+  Portal,
+  Text,
+  TextInput,
+} from "react-native-paper";
 
 export default function NotesScreen() {
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [reportingNote, setReportingNote] = useState<any>(null);
+  const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
+  const [searchText, setSearchText] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("All");
+
+  const subjects = [
+    "All",
+    ...Array.from(new Set(notes.map((note) => note.subject).filter(Boolean))),
+  ];
+
+  const filteredNotes = notes.filter((note) => {
+    const matchesSearch =
+      note.title?.toLowerCase().includes(searchText.toLowerCase()) ||
+      note.subject?.toLowerCase().includes(searchText.toLowerCase());
+
+    const matchesSubject =
+      selectedSubject === "All" || note.subject === selectedSubject;
+
+    return matchesSearch && matchesSubject;
+  });
+
+  const noteReportReasons = [
+    "Inappropriate content",
+    "Irrelevant study material",
+    "Misleading or incorrect information",
+    "Spam or duplicate note",
+    "Copyright or ownership concern",
+    "Other",
+  ];
+
+  const toggleReason = (reason: string) => {
+    setSelectedReasons((prev) =>
+      prev.includes(reason)
+        ? prev.filter((item) => item !== reason)
+        : [...prev, reason],
+    );
+  };
 
   const handleReportNote = async (note: any) => {
     const user = auth.currentUser;
@@ -26,17 +71,26 @@ export default function NotesScreen() {
       return;
     }
 
+    if (selectedReasons.length === 0) {
+      Alert.alert("Select Reason", "Please select at least one reason.");
+      return;
+    }
+
     try {
       await createReport({
         type: "Inappropriate Content",
         title: `Reported Note: ${note.title}`,
-        description: `The note "${note.title}" was reported by a user.`,
+        description: `Reasons: ${selectedReasons.join(", ")}`,
+        reasons: selectedReasons,
         reportedBy: user.email ?? "Student",
         relatedItemId: note.id,
         relatedItemType: "note",
       });
 
       Alert.alert("Reported", "This note has been reported to the admin.");
+
+      setReportingNote(null);
+      setSelectedReasons([]);
     } catch (error: any) {
       Alert.alert("Error", error?.message ?? "Failed to report note.");
     }
@@ -66,6 +120,31 @@ export default function NotesScreen() {
     >
       <Text style={styles.title}>Study Notes 📚</Text>
 
+      <TextInput
+        label="Search notes"
+        mode="outlined"
+        value={searchText}
+        onChangeText={setSearchText}
+        style={styles.input}
+      />
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipContainer}
+      >
+        {subjects.map((subject) => (
+          <Chip
+            key={subject}
+            selected={selectedSubject === subject}
+            onPress={() => setSelectedSubject(subject)}
+            style={styles.chip}
+          >
+            {subject}
+          </Chip>
+        ))}
+      </ScrollView>
+
       <Button
         mode="contained"
         style={styles.uploadButton}
@@ -77,7 +156,7 @@ export default function NotesScreen() {
       {notes.length === 0 ? (
         <Text style={styles.empty}>No notes uploaded yet.</Text>
       ) : (
-        notes.map((note) => (
+        filteredNotes.map((note) => (
           <View key={note.id} style={styles.card}>
             <TouchableOpacity onPress={() => Linking.openURL(note.fileUrl)}>
               <Text style={styles.noteTitle}>📄 {note.title}</Text>
@@ -104,13 +183,61 @@ export default function NotesScreen() {
             <Button
               mode="text"
               textColor="#EF4444"
-              onPress={() => handleReportNote(note)}
+              onPress={() => {
+                setReportingNote(note);
+                setSelectedReasons([]);
+              }}
             >
               Report Note
             </Button>
           </View>
         ))
       )}
+
+      <Portal>
+        <Modal
+          visible={!!reportingNote}
+          onDismiss={() => {
+            setReportingNote(null);
+            setSelectedReasons([]);
+          }}
+          contentContainerStyle={styles.reportModal}
+        >
+          <Text style={styles.reportTitle}>
+            Report {reportingNote?.title ?? "Note"}
+          </Text>
+
+          {noteReportReasons.map((reason) => (
+            <Checkbox.Item
+              key={reason}
+              label={reason}
+              status={
+                selectedReasons.includes(reason) ? "checked" : "unchecked"
+              }
+              onPress={() => toggleReason(reason)}
+            />
+          ))}
+
+          <Button
+            mode="contained"
+            disabled={selectedReasons.length === 0}
+            onPress={() => handleReportNote(reportingNote)}
+            style={styles.submitReportButton}
+          >
+            Submit Report
+          </Button>
+
+          <Button
+            mode="text"
+            onPress={() => {
+              setReportingNote(null);
+              setSelectedReasons([]);
+            }}
+          >
+            Cancel
+          </Button>
+        </Modal>
+      </Portal>
     </ScrollView>
   );
 }
@@ -159,5 +286,37 @@ const styles = StyleSheet.create({
   quizButton: {
     marginTop: 12,
     borderRadius: 18,
+  },
+  reportModal: {
+    backgroundColor: "#FFFFFF",
+    padding: 22,
+    margin: 24,
+    borderRadius: 22,
+  },
+
+  reportTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+
+  submitReportButton: {
+    marginTop: 12,
+    borderRadius: 20,
+    backgroundColor: "#8B5CF6",
+  },
+
+  chipContainer: {
+    marginBottom: 16,
+  },
+
+  input: {
+    marginBottom: 16,
+    backgroundColor: "#FFFFFF",
+  },
+
+  chip: {
+    marginRight: 8,
+    marginBottom: 16,
   },
 });
