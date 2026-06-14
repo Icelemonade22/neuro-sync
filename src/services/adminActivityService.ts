@@ -1,33 +1,39 @@
 import { db } from "@/config/firebase";
 import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 
+// Retrieve recent platform activities for the admin dashboard
 export async function getRecentAdminActivity() {
   const activities: any[] = [];
 
+  // Retrieve the latest uploaded notes
   const notesQuery = query(
     collection(db, "notes"),
     orderBy("createdAt", "desc"),
     limit(5),
   );
 
+  // Retrieve the latest submitted reports
   const reportsQuery = query(
     collection(db, "reports"),
     orderBy("createdAt", "desc"),
     limit(5),
   );
 
+  // Retrieve the latest created study rooms
   const roomsQuery = query(
     collection(db, "studyRooms"),
     orderBy("createdAt", "desc"),
     limit(5),
   );
 
+  // Retrieve the latest recorded study sessions
   const sessionsQuery = query(
     collection(db, "studySessions"),
     orderBy("createdAt", "desc"),
     limit(5),
   );
 
+  // Execute all queries simultaneously for better performance
   const [notesSnap, reportsSnap, roomsSnap, sessionsSnap] = await Promise.all([
     getDocs(notesQuery),
     getDocs(reportsQuery),
@@ -35,6 +41,7 @@ export async function getRecentAdminActivity() {
     getDocs(sessionsQuery),
   ]);
 
+  // Add note activities
   notesSnap.forEach((doc) => {
     const data = doc.data();
 
@@ -48,6 +55,7 @@ export async function getRecentAdminActivity() {
     });
   });
 
+  // Add report activities
   reportsSnap.forEach((doc) => {
     const data = doc.data();
 
@@ -61,6 +69,7 @@ export async function getRecentAdminActivity() {
     });
   });
 
+  // Add study room activities
   roomsSnap.forEach((doc) => {
     const data = doc.data();
 
@@ -74,6 +83,7 @@ export async function getRecentAdminActivity() {
     });
   });
 
+  // Add study session activities
   sessionsSnap.forEach((doc) => {
     const data = doc.data();
 
@@ -90,6 +100,7 @@ export async function getRecentAdminActivity() {
     });
   });
 
+  // Sort all activities from newest to oldest
   activities.sort((a, b) => {
     const aTime = a.createdAt?.toDate?.()?.getTime?.() ?? 0;
     const bTime = b.createdAt?.toDate?.()?.getTime?.() ?? 0;
@@ -97,5 +108,6 @@ export async function getRecentAdminActivity() {
     return bTime - aTime;
   });
 
+  // Return the 8 most recent activities
   return activities.slice(0, 8);
 }

@@ -20,6 +20,7 @@ import {
 import { Text } from "react-native-paper";
 
 export default function DashboardScreen() {
+  // State variables to hold user data, loading status, and analytics
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [todayMinutes, setTodayMinutes] = useState(0);
@@ -43,8 +44,8 @@ export default function DashboardScreen() {
     const sessions = await getUserSessions(user.uid);
     const analyticsResult = calculateAnalytics(sessions);
     setAnalytics(analyticsResult);
-    const minutesToday = calculateTodayMinutes(sessions);
 
+    const minutesToday = calculateTodayMinutes(sessions);
     setTodayMinutes(minutesToday);
 
     const burnout = detectBurnout(sessions);
@@ -119,7 +120,6 @@ export default function DashboardScreen() {
             </View>
           )}
         </TouchableOpacity>
-
         <LinearGradient
           colors={["#8B5CF6", "#A78BFA"]}
           start={{ x: 0, y: 0 }}
@@ -155,7 +155,6 @@ export default function DashboardScreen() {
             Best streak: {profile?.longestStreak ?? 0} days
           </Text>
         </LinearGradient>
-
         <View style={styles.communityCard}>
           <Text style={styles.communityTitle}>Community Standing</Text>
 
@@ -171,7 +170,6 @@ export default function DashboardScreen() {
             Warnings: {profile?.warningCount ?? 0}
           </Text>
         </View>
-
         {burnoutWarning && (
           <View style={styles.burnoutCard}>
             <Text style={styles.burnoutTitle}>{burnoutWarning.title}</Text>
@@ -179,7 +177,6 @@ export default function DashboardScreen() {
             <Text style={styles.burnoutMessage}>{burnoutWarning.message}</Text>
           </View>
         )}
-
         <View style={[styles.card, styles.cardShadow]}>
           <View style={styles.row}>
             <Text style={styles.cardLabel}>NEXT SESSION</Text>
@@ -193,7 +190,6 @@ export default function DashboardScreen() {
             Best subject based on recent study activity
           </Text>
         </View>
-
         <TouchableOpacity
           style={styles.quickButton}
           onPress={() => router.push("/session")}
@@ -205,6 +201,7 @@ export default function DashboardScreen() {
           </Text>
         </TouchableOpacity>
 
+        {/*Daily Goal Card*/}
         <View style={[styles.card, styles.cardShadow]}>
           <View style={styles.row}>
             <Text style={styles.cardLabel}>TODAY'S GOAL</Text>
@@ -215,11 +212,13 @@ export default function DashboardScreen() {
             Complete {dailyGoal} minutes of study
           </Text>
 
+          {/*Progress Bar*/}
           <View style={styles.progressBar}>
             <View
               style={[
                 styles.progressFill,
                 {
+                  // Cap at 100% fill if user exceeds daily goal
                   width: `${Math.min((todayMinutes / dailyGoal) * 100, 100)}%`,
                 },
               ]}
@@ -227,12 +226,11 @@ export default function DashboardScreen() {
           </View>
 
           <Text style={styles.progressText}>
+            {/* }Show minutes studied today vs goal */}
             {todayMinutes} / {dailyGoal} min
           </Text>
         </View>
-
         <Text style={styles.sectionTitle}>Your Study Buddy</Text>
-
         <View style={[styles.card, styles.cardShadow]}>
           {activeRoom ? (
             <>
@@ -271,9 +269,7 @@ export default function DashboardScreen() {
             </>
           )}
         </View>
-
         <Text style={styles.sectionTitle}>Your Progress</Text>
-
         <View style={styles.statsRow}>
           <StatBox
             value={`${analytics?.totalHours ?? 0}`}

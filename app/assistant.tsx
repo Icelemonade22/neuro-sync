@@ -23,34 +23,61 @@ import {
 import { Button, Text, TextInput } from "react-native-paper";
 
 export default function AssistantScreen() {
+  // Store the user's current question input
   const [question, setQuestion] = useState("");
+
+  // Store chat messages between the user and study assistant
   const [messages, setMessages] = useState<any[]>([
     {
       role: "assistant",
       text: "Hi 👋 I'm your NeuroSync Study Assistant. Ask me anything about studying, focus, productivity, or motivation.",
     },
   ]);
+
+  // Store user profile and progress data for personalized AI responses
   const [profile, setProfile] = useState<any>(null);
-  const [thinking, setThinking] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
   const [insights, setInsights] = useState<any>(null);
   const [forecast, setForecast] = useState<any>(null);
 
+  // Control loading state while the AI is generating an answer
+  const [thinking, setThinking] = useState(false);
+
+  // Send the user's question to the AI assistant
   const handleSend = async () => {
-    if (!question.trim() || thinking) return;
+    // Prevent empty messages or duplicate requests while AI is responding
+    //if (!question.trim() || thinking) return;
+
+    if (!question.trim()) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: "Please ask a question.",
+        },
+      ]);
+      return;
+    }
+
+    if (thinking) return;
 
     const userQuestion = question;
 
+    // Create a user message object for the chat UI
     const userMessage = {
       role: "user",
       text: userQuestion,
     };
 
+    // Display the user's message immediately
     setMessages((prev) => [...prev, userMessage]);
+
+    // Clear input field and show thinking indicator
     setQuestion("");
     setThinking(true);
 
     try {
+      // Request an AI response using the question and student progress data
       const answer = await askStudyAssistant(
         userQuestion,
         profile,
@@ -59,19 +86,23 @@ export default function AssistantScreen() {
         forecast,
       );
 
+      // Create assistant message object from AI response
       const assistantMessage = {
         role: "assistant",
         text: answer,
       };
 
+      // Display AI response in the chat
       setMessages((prev) => [...prev, assistantMessage]);
 
       const user = auth.currentUser;
 
+      // Save the conversation to Firebase for chat history
       if (user) {
         await saveChatMessage(user.uid, userQuestion, answer);
       }
     } catch (error) {
+      // Log error for debugging and show fallback message to user
       console.log("FULL AI ERROR:", error);
 
       setMessages((prev) => [
@@ -82,21 +113,26 @@ export default function AssistantScreen() {
         },
       ]);
     } finally {
+      // Stop thinking indicator after request completes
       setThinking(false);
     }
   };
 
   useEffect(() => {
+    // Load user data, progress analytics, and previous chat history
     const loadProfile = async () => {
       const user = auth.currentUser;
 
+      // Stop loading if no authenticated user is found
       if (!user) return;
 
+      // Retrieve previous assistant chat history from Firebase
       const history = await getChatHistory(user.uid);
 
       if (history.length > 0) {
         const restoredMessages: any[] = [];
 
+        // Rebuild chat messages from saved question-answer history
         history.forEach((item: any) => {
           restoredMessages.push({
             role: "user",
@@ -112,14 +148,17 @@ export default function AssistantScreen() {
         setMessages(restoredMessages);
       }
 
+      // Retrieve user profile for personalized assistant responses
       const profileData = await getUserProfile(user.uid);
       setProfile(profileData);
 
+      // Retrieve study sessions and calculate progress analytics
       const sessions = await getUserSessions(user.uid);
 
       const analyticsResult = calculateAnalytics(sessions);
       setAnalytics(analyticsResult);
 
+      // Generate study insights and forecast for AI context
       const insightResult = generateAnalyticsInsights(sessions);
       setInsights(insightResult);
 
@@ -139,6 +178,7 @@ export default function AssistantScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      {/* Header with back button, title, and clear chat button */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={28} color="#111" />
@@ -160,6 +200,7 @@ export default function AssistantScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Chat message list */}
       <ScrollView
         style={styles.chatContainer}
         contentContainerStyle={{ paddingBottom: 30 }}
@@ -192,6 +233,7 @@ export default function AssistantScreen() {
           );
         })}
 
+        {/* Temporary message shown while AI is generating a response */}
         {thinking && (
           <View style={styles.assistantWrapper}>
             <View style={styles.assistantBubble}>
@@ -203,6 +245,7 @@ export default function AssistantScreen() {
         )}
       </ScrollView>
 
+      {/* Quick suggestion chips for common study-related questions */}
       <View style={styles.suggestionRow}>
         {[
           "Improve focus",
@@ -220,6 +263,7 @@ export default function AssistantScreen() {
         ))}
       </View>
 
+      {/* Input area for typing and sending questions */}
       <View style={styles.inputRow}>
         <TextInput
           mode="outlined"

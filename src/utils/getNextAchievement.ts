@@ -1,8 +1,11 @@
+// Determine the next achievement milestone for the student
 export function getNextAchievement(profile: any, analytics: any) {
+  // Retrieve current progress metrics
   const totalSessions = analytics?.totalSessions ?? 0;
   const focusScore = analytics?.focusScore ?? 0;
   const streak = profile?.streak ?? 0;
 
+  // Achievement 1: Complete 15 study sessions
   if (totalSessions < 15) {
     return {
       title: "Consistency Master",
@@ -13,6 +16,7 @@ export function getNextAchievement(profile: any, analytics: any) {
     };
   }
 
+  // Achievement 2: Reach a focus score of 85
   if (focusScore < 85) {
     return {
       title: "Focus Champion",
@@ -23,6 +27,7 @@ export function getNextAchievement(profile: any, analytics: any) {
     };
   }
 
+  // Achievement 3: Maintain a 7-day study streak
   if (streak < 7) {
     return {
       title: "7-Day Streak",
@@ -33,6 +38,7 @@ export function getNextAchievement(profile: any, analytics: any) {
     };
   }
 
+  // Final achievement shown when all previous milestones are completed
   return {
     title: "Elite Learner",
     progress: 100,

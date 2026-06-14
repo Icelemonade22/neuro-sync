@@ -4,12 +4,12 @@ import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Text } from "react-native-paper";
 
@@ -17,16 +17,19 @@ export default function AdminNotesScreen() {
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Load notes when the screen opens
   useEffect(() => {
     loadNotes();
   }, []);
 
+  // Retrieve all uploaded study notes
   const loadNotes = async () => {
     const data = await getAllNotes();
     setNotes(data);
     setLoading(false);
   };
 
+  // Delete a selected study note
   const handleDelete = async (noteId: string) => {
     Alert.alert("Delete Note", "Are you sure you want to delete this note?", [
       {
@@ -37,14 +40,17 @@ export default function AdminNotesScreen() {
         text: "Delete",
         style: "destructive",
         onPress: async () => {
+          // Remove note from Firestore
           await deleteNote(noteId);
 
+          // Update the displayed notes list
           setNotes((prev) => prev.filter((note) => note.id !== noteId));
         },
       },
     ]);
   };
 
+  // Display loading indicator while notes are loading
   if (loading) {
     return (
       <View style={styles.center}>

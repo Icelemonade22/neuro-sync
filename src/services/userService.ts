@@ -1,6 +1,8 @@
+// src/services/userService.ts
 import { db } from "@/config/firebase";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 
+// User onboarding data model
 export type OnboardingData = {
   uid: string;
   email: string;
@@ -21,9 +23,11 @@ export type OnboardingData = {
   groupPreference: string;
 };
 
+// Save onboarding data to Firestore
 export async function saveOnboardingData(data: OnboardingData) {
   const userRef = doc(db, "users", data.uid);
 
+  // Create or update the user profile
   await setDoc(
     userRef,
     {
@@ -34,12 +38,14 @@ export async function saveOnboardingData(data: OnboardingData) {
       studyLevel: data.studyLevel,
       onboardingCompleted: true,
 
+      // Store study preferences
       studyPreferences: {
         sessionType: data.sessionType,
         focusLevel: data.focusLevel,
         accountabilityLevel: data.accountabilityLevel,
       },
 
+      // Store study goals
       studyGoals: {
         mainGoal: data.mainGoal,
         dailyStudyMinutes: data.dailyStudyMinutes,
@@ -47,11 +53,13 @@ export async function saveOnboardingData(data: OnboardingData) {
         purpose: data.purpose,
       },
 
+      // Store availability information
       availability: {
         preferredTime: data.preferredTime,
         availableDays: data.availableDays,
       },
 
+      // Store study style preferences
       studyStyle: {
         communicationStyle: data.communicationStyle,
         partnerPreference: data.partnerPreference,

@@ -14,23 +14,54 @@ export default function AdminDashboard() {
   const [recommendations, setRecommendations] = useState<string[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
 
+  // Load dashboard data when the screen opens
   useEffect(() => {
     loadStats();
   }, []);
 
+  // Retrieve platform statistics, insights,
+  // recommendations, and recent activity
   const loadStats = async () => {
+    const start = Date.now();
+
     const data = await getAdminDashboardStats();
     const insightData = await getAdminPlatformInsights();
     const recommendationData = await getAdminRecommendations();
     const activityData = await getRecentAdminActivity();
 
+    // Update dashboard data
     setStats(data);
     setInsights(insightData);
     setRecommendations(recommendationData);
     setActivities(activityData);
+
+    // Hide loading indicator after data is loaded
     setLoading(false);
+
+    const end = Date.now();
+
+    console.log(`Dashboard Load Time: ${end - start} ms`);
   };
 
+  // Format activity timestamps for display in the admin dashboard
+  const formatActivityTime = (createdAt: any) => {
+    // Return a fallback value if no timestamp exists
+    if (!createdAt?.toDate) return "Recently";
+
+    // Convert Firestore timestamp to a JavaScript Date object
+    const date = createdAt.toDate();
+
+    // Display date and time in a readable format
+    return date.toLocaleString([], {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Display loading indicator while dashboard data is loading
   if (loading) {
     return (
       <View style={styles.center}>
@@ -140,6 +171,10 @@ export default function AdminDashboard() {
                 <Text style={styles.activityTitle}>{activity.title}</Text>
                 <Text style={styles.activityDescription}>
                   {activity.description}
+                </Text>
+
+                <Text style={styles.activityTime}>
+                  🕒 {formatActivityTime(activity.createdAt)}
                 </Text>
               </View>
             </View>
@@ -392,5 +427,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "bold",
     color: "#374151",
+  },
+
+  activityTime: {
+    marginTop: 4,
+    color: "#8B5CF6",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

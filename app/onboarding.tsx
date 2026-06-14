@@ -1,3 +1,5 @@
+// app/onboarding.tsx
+// Onboarding screen for collecting user profile and study preferences.
 import { auth } from "@/config/firebase";
 import { saveOnboardingData } from "@/src/services/userService";
 import Slider from "@react-native-community/slider";
@@ -12,6 +14,8 @@ import {
 } from "react-native";
 import { Button, Menu, Text, TextInput } from "react-native-paper";
 
+// Allows users to configure their profile,
+// study goals, preferences, and availability.
 export default function OnboardingScreen() {
   const [fullName, setFullName] = useState("");
   const [subject, setSubject] = useState("");
@@ -35,6 +39,7 @@ export default function OnboardingScreen() {
 
   const [loading, setLoading] = useState(false);
 
+  // Convert slider values into readable labels.
   const getLevelLabel = (value: number) => {
     if (value < 20) return "Very Low";
     if (value < 40) return "Low";
@@ -43,9 +48,12 @@ export default function OnboardingScreen() {
     return "Very High";
   };
 
+  // Default onboarding preferences.
   const availableDays = ["Monday", "Tuesday", "Thursday"];
+
   const purpose = ["Exam preparation", "Assignment"];
 
+  // Validate and save onboarding information.
   const handleSubmit = async () => {
     if (!fullName || !subject || !studyLevel) {
       Alert.alert(
@@ -55,6 +63,7 @@ export default function OnboardingScreen() {
       return;
     }
 
+    // Retrieve the current authenticated user.
     const user = auth.currentUser;
 
     if (!user) {
@@ -62,9 +71,13 @@ export default function OnboardingScreen() {
       return;
     }
 
+    // Try to save the onboarding data to Firestore using the saveOnboardingData
+    // function. If the save is successful, navigate the user to the main app
+    // screen. If there's an error during the save process, show an error alert
     try {
       setLoading(true);
 
+      // Save user preferences to Firestore.
       await saveOnboardingData({
         uid: user.uid,
         email: user.email ?? "",
@@ -299,14 +312,20 @@ export default function OnboardingScreen() {
       </View>
 
       <View style={styles.optionRow}>
-        {["One-to-one", "Group"].map((group) => (
+        {/* Group study feature is planned for a future release */}
+        <SmallOption
+          title="One-to-one"
+          selected={groupPreference === "One-to-one"}
+          onPress={() => setGroupPreference("One-to-one")}
+        />
+
+        <View style={{ opacity: 0.5 }}>
           <SmallOption
-            key={group}
-            title={group}
-            selected={groupPreference === group}
-            onPress={() => setGroupPreference(group)}
+            title="Group (Coming Soon)"
+            selected={false}
+            onPress={() => {}}
           />
-        ))}
+        </View>
       </View>
 
       <Button
@@ -322,6 +341,7 @@ export default function OnboardingScreen() {
   );
 }
 
+// Reusable card for study preference selection.
 function OptionCard({
   title,
   subtitle,
@@ -348,6 +368,7 @@ function OptionCard({
   );
 }
 
+// Reusable option button for onboarding selections.
 function SmallOption({
   title,
   selected,
@@ -474,5 +495,14 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 40,
     marginBottom: 16,
+  },
+
+  disabledOption: {
+    backgroundColor: "#E5E7EB",
+    opacity: 0.6,
+  },
+
+  disabledOptionText: {
+    color: "#6B7280",
   },
 });

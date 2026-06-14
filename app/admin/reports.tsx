@@ -5,7 +5,10 @@ import {
   updateReportPriority,
   updateReportStatus,
 } from "@/src/services/reportService";
-import { issueUserWarning } from "@/src/services/warningService";
+import {
+  issueUserWarning,
+  removeUserWarning,
+} from "@/src/services/warningService";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
@@ -25,6 +28,7 @@ export default function AdminReportsScreen() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
 
+  // Listen for report updates when the screen opens
   useEffect(() => {
     const unsubscribe = listenReports((data) => {
       setReports(data);
@@ -34,11 +38,13 @@ export default function AdminReportsScreen() {
     return unsubscribe;
   }, []);
 
+  // Filter reports by selected status
   const filteredReports =
     filter === "All"
       ? reports
       : reports.filter((report) => report.status === filter);
 
+  // Delete a report after admin confirmation
   const handleDelete = (reportId: string) => {
     Alert.alert(
       "Delete Report",
@@ -56,7 +62,9 @@ export default function AdminReportsScreen() {
     );
   };
 
+  // Issue a warning to a reported user
   const handleIssueWarning = async (report: any) => {
+    // Only user reports can receive warnings
     if (report.relatedItemType !== "user" || !report.relatedItemId) {
       Alert.alert(
         "Invalid Report",
@@ -66,6 +74,7 @@ export default function AdminReportsScreen() {
     }
 
     try {
+      // Create warning record and notify the user
       await issueUserWarning({
         userId: report.relatedItemId,
         reportId: report.id,
@@ -73,6 +82,7 @@ export default function AdminReportsScreen() {
           "Your account has received a warning after a report was reviewed by the administration team.",
       });
 
+      // Mark the report as having a warning issued
       await updateDoc(doc(db, "reports", report.id), {
         warningIssued: true,
         warningIssuedAt: serverTimestamp(),
@@ -84,6 +94,32 @@ export default function AdminReportsScreen() {
     }
   };
 
+  // Remove one warning from a reported user
+  const handleRemoveWarning = async (report: any) => {
+    // Only user reports can have warnings removed
+    if (report.relatedItemType !== "user" || !report.relatedItemId) {
+      Alert.alert(
+        "Invalid Report",
+        "This action only applies to user reports.",
+      );
+      return;
+    }
+
+    try {
+      // Decrease the user's warning count
+      await removeUserWarning(report.relatedItemId);
+
+      Alert.alert(
+        "Warning Removed",
+        "One warning has been removed from the user.",
+      );
+    } catch (error) {
+      console.log(error);
+      Alert.alert("Error", "Failed to remove warning.");
+    }
+  };
+
+  // Show loading indicator while reports are being fetched
   if (loading) {
     return (
       <View style={styles.center}>
@@ -252,6 +288,18 @@ export default function AdminReportsScreen() {
                 </Button>
               )}
 
+            {report.relatedItemType === "user" &&
+              report.status === "Resolved" && (
+                <Button
+                  mode="outlined"
+                  compact
+                  style={styles.removeWarningButton}
+                  onPress={() => handleRemoveWarning(report)}
+                >
+                  ➖ Remove Warning
+                </Button>
+              )}
+
             <Button
               mode="text"
               textColor="#EF4444"
@@ -402,6 +450,10 @@ const styles = StyleSheet.create({
   },
 
   warnButton: {
+    marginTop: 16,
+    borderRadius: 999,
+  },
+  removeWarningButton: {
     marginTop: 16,
     borderRadius: 999,
   },

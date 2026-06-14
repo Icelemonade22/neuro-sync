@@ -2,16 +2,20 @@ import { GoogleGenAI } from "@google/genai";
 import { defineSecret } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
 
+// Securely store and access the Gemini API key from Firebase secrets
 const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
+// Cloud Function for NeuroSync Study Assistant
 export const askStudyAssistantHttp = onRequest(
   {
     secrets: [geminiApiKey],
     cors: true,
   },
   async (req, res) => {
+    // Extract student question and progress data from request body
     const { question, profile, analytics, insights, forecast } = req.body;
 
+    // Validate that the user has entered a question
     if (!question) {
       res.status(400).json({
         answer: "Please ask a question.",
@@ -19,6 +23,7 @@ export const askStudyAssistantHttp = onRequest(
       return;
     }
 
+    // Initialize Gemini AI using the secured API key
     const ai = new GoogleGenAI({
       apiKey: geminiApiKey.value(),
     });
@@ -36,7 +41,9 @@ Your primary role is to help students with:
 
 You may also answer academic questions related to the student's studies, explain concepts, summarize topics, and provide learning guidance when requested.
 
-If a question is unrelated to studying, education, learning, academic subjects, productivity, or personal development, answer briefly and politely redirect the conversation back to learning-related topics.
+If a question is unrelated to studying, education, learning, academic subjects, 
+productivity, or personal development, answer briefly and politely redirect the 
+conversation back to learning-related topics.
 
 Student profile:
 - Subject: ${profile?.subject ?? "Unknown"}
@@ -91,15 +98,18 @@ Return plain readable text only.
 `;
 
     try {
+      // Send the prompt to Gemini and generate a study assistant response
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
       });
 
+      // Return AI response to the mobile app
       res.status(200).json({
         answer: response.text,
       });
     } catch (error: any) {
+      // Handle AI or server errors
       console.error(error);
 
       res.status(500).json({
@@ -109,14 +119,17 @@ Return plain readable text only.
   },
 );
 
+// Cloud Function for generating AI revision quizzes
 export const generateQuizHttp = onRequest(
   {
     secrets: [geminiApiKey],
     cors: true,
   },
   async (req, res) => {
+    // Extract note details and selected difficulty from request body
     const { title, subject, content, difficulty } = req.body;
 
+    // Validate required quiz information
     if (!title || !subject) {
       res.status(400).json({
         quiz: "Please provide a note title and subject.",
@@ -124,10 +137,12 @@ export const generateQuizHttp = onRequest(
       return;
     }
 
+    // Initialize Gemini AI using the secured API key
     const ai = new GoogleGenAI({
       apiKey: geminiApiKey.value(),
     });
 
+    // Build prompt that instructs Gemini to generate a structured quiz
     const prompt = `
 You are NeuroSync Quiz Generator.
 
@@ -179,15 +194,18 @@ answerIndex must be 0, 1, 2, or 3.
 `;
 
     try {
+      // Send prompt to Gemini to generate quiz questions
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
       });
 
+      // Return generated quiz JSON text to the mobile app
       res.status(200).json({
         quiz: response.text,
       });
     } catch (error: any) {
+      // Handle quiz generation errors
       console.error(error);
 
       res.status(500).json({

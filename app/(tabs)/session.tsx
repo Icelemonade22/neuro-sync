@@ -9,9 +9,9 @@ import {
   updateStudyStreak,
 } from "@/src/services/gamificationService";
 import { getUserProfile } from "@/src/services/getUserProfile";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -34,47 +34,60 @@ export default function SessionScreen() {
 
   const [modalHeading, setModalHeading] = useState("Session Completed!");
   const [modalEmoji, setModalEmoji] = useState("✅");
+  const [modalQueue, setModalQueue] = useState<any[]>([]);
 
   const [achievementData, setAchievementData] = useState({
     title: "",
     xp: 0,
   });
 
-  useEffect(() => {
-    const loadSessionPreference = async () => {
-      const user = auth.currentUser;
+  // Load user's preferred session type and duration on component mount
+  useFocusEffect(
+    useCallback(() => {
+      const loadSessionPreference = async () => {
+        const user = auth.currentUser;
 
-      if (!user) return;
+        if (!user) return;
 
-      const profile = await getUserProfile(user.uid);
+        const profile = await getUserProfile(user.uid);
 
-      const preferredSessionType =
-        profile?.studyPreferences?.sessionType ?? "Pomodoro";
+        const preferredSessionType =
+          profile?.studyPreferences?.sessionType ?? "Pomodoro";
 
-      const duration = TEST_MODE
-        ? 30
-        : preferredSessionType === "Long Session"
-          ? 60 * 60
-          : 25 * 60;
+        // Set session duration based on preferred session type, using
+        // shorter durations in test mode
+        const duration = TEST_MODE
+          ? preferredSessionType === "Long Session"
+            ? 60
+            : 30
+          : preferredSessionType === "Long Session"
+            ? 60 * 60
+            : 25 * 60;
 
-      setSessionType(preferredSessionType);
-      setSessionDuration(duration);
-      setSecondsLeft(duration);
-    };
+        setSessionType(preferredSessionType);
+        setSessionDuration(duration);
+        setSecondsLeft(duration);
+        setIsRunning(false);
+      };
 
-    loadSessionPreference();
-  }, []);
+      loadSessionPreference();
+    }, []),
+  );
 
+  // Timer effect that counts down every second when the session is running
   useEffect(() => {
     if (!isRunning || secondsLeft <= 0) return;
 
+    // Set up an interval to decrease the seconds left every second
     const timer = setInterval(() => {
       setSecondsLeft((prev) => prev - 1);
     }, 1000);
 
+    // Clear the interval when the component unmounts or when the timer stops
     return () => clearInterval(timer);
   }, [isRunning, secondsLeft]);
 
+  // Effect that triggers when the timer reaches zero to complete the session
   useEffect(() => {
     if (secondsLeft === 0 && isRunning) {
       setIsRunning(false);
@@ -83,13 +96,18 @@ export default function SessionScreen() {
     }
   }, [secondsLeft, isRunning]);
 
+  // Helper function to format the remaining time in MM:SS format
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
 
+    // Format the time as MM:SS, adding a leading zero to seconds if less than 10
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
+  // Function to handle the completion of a focus session, including saving the session
+  // to Firestore, updating the user's study streak, awarding XP, and checking for
+  // mission completions and badge unlocks.
   const completeSession = async () => {
     if (savingSession) return;
 
@@ -104,10 +122,11 @@ export default function SessionScreen() {
     }
 
     try {
+      // Save the completed session to Firestore with the user's ID, session type,
+      // duration, and timestamp
       await addDoc(collection(db, "studySessions"), {
         userId: user.uid,
         sessionType: sessionType,
-        //durationMinutes: sessionDuration / 60,
         durationMinutes: TEST_MODE
           ? sessionType === "Long Session"
             ? 60
@@ -117,35 +136,70 @@ export default function SessionScreen() {
         createdAt: serverTimestamp(),
       });
 
+      // Update the user's study streak and calculate XP rewards
       const streak = await updateStudyStreak(user.uid);
 
+      // Calculate XP based on the session type and current streak multiplier
       const multiplier = getStreakMultiplier(streak);
 
+      // For simplicity, let's say each session is worth 20 XP multiplied by
+      // the streak multiplier
       const earnedXp = Math.round(20 * multiplier);
 
+      // Award XP to the user
       await awardUserXP(user.uid, earnedXp);
 
+      // Check for mission completion and badge unlocks
       const missionCompleted = await completeMission("study");
 
+      // Check if the user unlocked the "First Focus Session" badge
       const unlocked = await unlockBadge(user.uid, "First Focus Session");
 
-      setModalHeading(
-        missionCompleted
-          ? "Mission Completed!"
-          : unlocked
-            ? "Achievement Unlocked!"
-            : "Session Completed!",
-      );
+      // Create a queue of modals to show based on what was achieved
+      // during this session
+      const queue = [];
 
-      setModalEmoji(missionCompleted ? "🎯" : unlocked ? "🎉" : "✅");
+      // If the user completed a mission, add a mission completion modal
+      // to the queue
+      if (missionCompleted) {
+        queue.push({
+          heading: "Mission Completed!",
+          emoji: "🎯",
+          title: "Complete 1 Focus Session Mission Completed",
+          xp: 30,
+        });
+      }
 
+      // If the user unlocked a badge, add an achievement unlocked modal to the
+      // queue
+      if (unlocked) {
+        queue.push({
+          heading: "Achievement Unlocked!",
+          emoji: "🎉",
+          title: "First Focus Session",
+          xp: earnedXp,
+        });
+      }
+
+      // Finally, add the session completion modal to the end of the queue
+      queue.push({
+        heading: "Session Completed!",
+        emoji: "✅",
+        title: "Focus Session Completed",
+        xp: earnedXp,
+      });
+
+      // Set the modal queue for display
+      setModalQueue(queue);
+
+      // Show the first modal in the queue
+      const firstModal = queue[0];
+
+      setModalHeading(firstModal.heading);
+      setModalEmoji(firstModal.emoji);
       setAchievementData({
-        title: missionCompleted
-          ? "Complete 1 Focus Session Mission Completed"
-          : unlocked
-            ? "First Focus Session"
-            : "Focus Session Completed",
-        xp: missionCompleted ? 30 : earnedXp,
+        title: firstModal.title,
+        xp: firstModal.xp,
       });
 
       setAchievementVisible(true);
@@ -157,6 +211,8 @@ export default function SessionScreen() {
     }
   };
 
+  // Effect to listen for authentication state changes and update the user's
+  // online status in Firestore
   const resetSession = () => {
     setIsRunning(false);
     setSecondsLeft(sessionDuration);
@@ -240,6 +296,7 @@ export default function SessionScreen() {
         Stop Music
       </Button>
 
+      {/* Render the AchievementModal and handle the logic for displaying queued modals */}
       <AchievementModal
         visible={achievementVisible}
         heading={modalHeading}
@@ -247,8 +304,24 @@ export default function SessionScreen() {
         title={achievementData.title}
         xp={achievementData.xp}
         onClose={() => {
-          setAchievementVisible(false);
-          router.replace("/(tabs)");
+          const remainingQueue = modalQueue.slice(1);
+
+          if (remainingQueue.length > 0) {
+            const nextModal = remainingQueue[0];
+
+            setModalQueue(remainingQueue);
+            setModalHeading(nextModal.heading);
+            setModalEmoji(nextModal.emoji);
+            setAchievementData({
+              title: nextModal.title,
+              xp: nextModal.xp,
+            });
+
+            setAchievementVisible(true);
+          } else {
+            setAchievementVisible(false);
+            router.replace("/(tabs)");
+          }
         }}
       />
     </ScrollView>

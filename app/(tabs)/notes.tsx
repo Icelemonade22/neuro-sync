@@ -1,5 +1,5 @@
 import { auth } from "@/config/firebase";
-import { listenNotes } from "@/src/services/noteService";
+import { deleteNote, listenNotes } from "@/src/services/noteService";
 import { createReport } from "@/src/services/reportService";
 import * as Linking from "expo-linking";
 import { router } from "expo-router";
@@ -30,22 +30,29 @@ export default function NotesScreen() {
   const [searchText, setSearchText] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("All");
 
+  // Extract the unique subjects from the notes to create filter chips
   const subjects = [
     "All",
     ...Array.from(new Set(notes.map((note) => note.subject).filter(Boolean))),
   ];
 
+  // Filter the notes based on the search text and selected subject.
   const filteredNotes = notes.filter((note) => {
+    // Check if the note's title or subject includes the search text (case-insensitive).
     const matchesSearch =
       note.title?.toLowerCase().includes(searchText.toLowerCase()) ||
       note.subject?.toLowerCase().includes(searchText.toLowerCase());
 
+    // Check if the note's subject matches the selected subject, or if "All"
+    // is selected.
     const matchesSubject =
       selectedSubject === "All" || note.subject === selectedSubject;
 
     return matchesSearch && matchesSubject;
   });
 
+  // Define the reasons that users can select when reporting a note for
+  // inappropriate content.
   const noteReportReasons = [
     "Inappropriate content",
     "Irrelevant study material",
@@ -55,6 +62,8 @@ export default function NotesScreen() {
     "Other",
   ];
 
+  // This function toggles the selection of a report reason when the user taps on
+  // it in the report modal.
   const toggleReason = (reason: string) => {
     setSelectedReasons((prev) =>
       prev.includes(reason)
@@ -63,20 +72,27 @@ export default function NotesScreen() {
     );
   };
 
+  // This function handles the process of reporting a note for inappropriate content.
   const handleReportNote = async (note: any) => {
     const user = auth.currentUser;
 
+    // Ensure that the user is logged in before allowing them to report a note.
+    // This is important for accountability and to prevent abuse of the reporting system.
     if (!user) {
       Alert.alert("Error", "You must be logged in to report a note.");
       return;
     }
 
+    // Ensure that at least one reason is selected before allowing the user
+    // to submit the report.
     if (selectedReasons.length === 0) {
       Alert.alert("Select Reason", "Please select at least one reason.");
       return;
     }
 
     try {
+      // Create a report in Firestore with the selected reasons and note details.
+      // The admin can review these reports to take appropriate action.
       await createReport({
         type: "Inappropriate Content",
         title: `Reported Note: ${note.title}`,
@@ -96,15 +112,65 @@ export default function NotesScreen() {
     }
   };
 
+  // Handle note deletion for the note owner only
+  const handleDeleteNote = (note: any) => {
+    // Get the currently logged-in user
+    const user = auth.currentUser;
+
+    // Stop if no user is logged in
+    if (!user) return;
+
+    // Allow deletion only if the note belongs to the current user
+    if (note.userId !== user.uid) {
+      Alert.alert("Not Allowed", "You can only delete your own notes.");
+      return;
+    }
+
+    // Ask for confirmation before deleting the note.
+    Alert.alert(
+      "Delete Note",
+      `Are you sure you want to delete "${note.title}"?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Delete the note from Firestore/Storage through the service function
+              await deleteNote(note.id);
+              Alert.alert("Deleted", "Your note has been deleted.");
+
+              // The real-time listener updates the notes list automatically
+            } catch (error: any) {
+              Alert.alert("Error", error?.message ?? "Failed to delete note.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // Set up a listener to fetch notes from Firestore in real-time when the component
+  // mounts.
   useEffect(() => {
+    const start = Date.now();
+
     const unsubscribe = listenNotes((data) => {
       setNotes(data);
       setLoading(false);
+
+      const end = Date.now();
+
+      console.log(`Notes Load Time: ${end - start} ms`);
     });
 
+    // Clean up the listener when the component unmounts to prevent memory leaks and
+    // unnecessary updates.
     return unsubscribe;
   }, []);
 
+  // Show a loading indicator while the notes are being fetched from Firestore.
   if (loading) {
     return (
       <View style={styles.center}>
@@ -116,7 +182,7 @@ export default function NotesScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 80 }}
+      contentContainerStyle={{ paddingBottom: 210 }}
     >
       <Text style={styles.title}>Study Notes 📚</Text>
 
@@ -190,6 +256,16 @@ export default function NotesScreen() {
             >
               Report Note
             </Button>
+
+            {note.userId === auth.currentUser?.uid && (
+              <Button
+                mode="text"
+                textColor="#EF4444"
+                onPress={() => handleDeleteNote(note)}
+              >
+                Delete Note
+              </Button>
+            )}
           </View>
         ))
       )}

@@ -18,6 +18,8 @@ export default function RequestsScreen() {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<any[]>([]);
 
+  // Function to load incoming buddy requests for the current user, allowing them
+  // to see any pending requests that have been sent to them.
   const loadRequests = async () => {
     const user = auth.currentUser;
     if (!user) return;
@@ -27,16 +29,23 @@ export default function RequestsScreen() {
     setLoading(false);
   };
 
+  // Load incoming buddy requests when the component mounts, allowing the user to see
+  // any pending requests that have been sent to them.
   useEffect(() => {
     loadRequests();
   }, []);
 
+  // Function to handle the user's response to a buddy request, allowing them to
+  // accept or reject the request.
   const handleResponse = async (
     request: any,
     status: "accepted" | "rejected",
   ) => {
+    // Update the status of the buddy request based on the user's response
+    // (accept or reject).
     await updateBuddyRequestStatus(request.id, status);
 
+    // If the request was accepted, attempt to create a study room based on the request.
     if (status === "accepted") {
       const result = await createStudyRoomFromRequest(request);
 
@@ -50,9 +59,13 @@ export default function RequestsScreen() {
       Alert.alert("Request Rejected");
     }
 
+    // Refresh the list of requests after responding to ensure the UI reflects
+    // the latest state, such as removing the handled request from the list of
+    // pending requests.
     loadRequests();
   };
 
+  // Show a loading indicator while buddy requests are being fetched.
   if (loading) {
     return (
       <View style={styles.center}>

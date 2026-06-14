@@ -52,6 +52,7 @@ export default function UploadNoteScreen() {
         subject,
         content,
         user.email ?? "Student",
+        user.uid,
       );
 
       const missions = await getTodayDailyMissions();

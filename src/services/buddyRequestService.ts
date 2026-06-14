@@ -1,3 +1,4 @@
+// src/services/buddyRequestService.ts
 import { db } from "@/config/firebase";
 import {
   addDoc,
@@ -11,13 +12,17 @@ import {
   where,
 } from "firebase/firestore";
 
+// Service functions for managing buddy requests, including sending requests
 export async function sendBuddyRequest({
+  // The ID and name of the user sending the request, the ID and name of the
+  // user receiving the request, and the compatibility score between them.
   fromUserId,
   fromName,
   toUserId,
   toName,
   compatibility,
 }: {
+  // The ID of the user sending the buddy request.
   fromUserId: string;
   fromName: string;
   toUserId: string;
@@ -30,6 +35,9 @@ export async function sendBuddyRequest({
     where("toUserId", "==", toUserId),
   );
 
+  // Check if a buddy request already exists between the two users to prevent
+  // duplicate requests. If a request already exists, return a message indicating
+  // that the request has already been sent.
   const existingSnap = await getDocs(existingQuery);
 
   if (!existingSnap.empty) {
@@ -39,6 +47,10 @@ export async function sendBuddyRequest({
     };
   }
 
+  // If no existing request is found, create a new buddy request document in the
+  // "buddyRequests" collection in Firestore with the provided information and a
+  // status of "pending". The createdAt field is set to the current server
+  // timestamp to track when the request was sent.
   await addDoc(collection(db, "buddyRequests"), {
     fromUserId,
     fromName,
@@ -49,12 +61,16 @@ export async function sendBuddyRequest({
     createdAt: serverTimestamp(),
   });
 
+  // Return a success message indicating that the buddy request has been sent.
   return {
     success: true,
     message: "Request sent.",
   };
 }
 
+// Function to retrieve incoming buddy requests for a specific user, filtering for
+// requests that are still pending. This allows the user to see who has sent them
+// buddy requests and decide whether to accept or reject them.
 export async function getIncomingBuddyRequests(uid: string) {
   const q = query(
     collection(db, "buddyRequests"),
@@ -70,6 +86,8 @@ export async function getIncomingBuddyRequests(uid: string) {
   }));
 }
 
+// Function to update the status of a buddy request, allowing the recipient to
+// accept or reject the request.
 export async function updateBuddyRequestStatus(
   requestId: string,
   status: "accepted" | "rejected",
@@ -82,6 +100,7 @@ export async function updateBuddyRequestStatus(
   });
 }
 
+// Function to create a study room based on an accepted buddy request.
 export async function createStudyRoomFromRequest(request: any) {
   const existingRoomQuery = query(
     collection(db, "studyRooms"),
@@ -117,6 +136,8 @@ export async function createStudyRoomFromRequest(request: any) {
   };
 }
 
+// Function to retrieve outgoing buddy requests sent by a specific user, allowing
+// the user to see the status of their sent requests and manage them accordingly.
 export async function getOutgoingBuddyRequests(uid: string) {
   const q = query(
     collection(db, "buddyRequests"),

@@ -3,11 +3,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Text } from "react-native-paper";
 
@@ -15,16 +15,23 @@ export default function AdminUsersScreen() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Load users when the screen opens
   useEffect(() => {
     loadUsers();
   }, []);
 
+  // Retrieve all registered users
   const loadUsers = async () => {
     const data = await getAllUsers();
+
+    // Update user list
     setUsers(data);
+
+    // Hide loading indicator
     setLoading(false);
   };
 
+  // Display loading indicator while users are loading
   if (loading) {
     return (
       <View style={styles.center}>

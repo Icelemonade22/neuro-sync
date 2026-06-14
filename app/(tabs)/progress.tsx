@@ -23,6 +23,7 @@ import { Text } from "react-native-paper";
 const screenWidth = Dimensions.get("window").width;
 
 export default function ProgressScreen() {
+  // State variables for analytics, reports, and AI-generated insights
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
@@ -33,51 +34,71 @@ export default function ProgressScreen() {
   const [aiSummary, setAiSummary] = useState("");
   const [nextAchievement, setNextAchievement] = useState<any>(null);
 
+  // Refresh analytics whenever the screen gains focus
   useFocusEffect(
     useCallback(() => {
       loadAnalytics();
     }, []),
   );
 
+  // Load and calculate all progress-related data
   const loadAnalytics = async () => {
+    const start = Date.now();
+
     setLoading(true);
 
     const user = auth.currentUser;
 
+    // Stop loading if no user is logged in
     if (!user) {
       setLoading(false);
       return;
     }
 
+    // Retrieve user profile information
     const profile = await getUserProfile(user.uid);
     setProfile(profile);
 
+    // Retrieve all study sessions for the current user
     const sessions = await getUserSessions(user.uid);
 
+    // Generate study analytics and focus scores
     const result = calculateAnalytics(sessions, profile?.streak ?? 0);
     setAnalytics(result);
 
+    // Calculate weekly study activity data for charts
     const weekly = calculateWeeklyActivity(sessions);
+
+    // Generate AI-powered study insights
     const smartInsights = generateAnalyticsInsights(sessions);
     setInsights(smartInsights);
 
+    // Predict future study performance based on current habits
     const forecastData = generateStudyForecast(result, smartInsights);
     setForecast(forecastData);
 
+    // Create a personalized AI summary of study progress
     const summary = generateAISummary(result, smartInsights, forecastData);
     setAiSummary(summary);
 
+    // Determine the next achievement milestone for the user
     const achievementData = getNextAchievement(profile, result);
     setNextAchievement(achievementData);
 
+    // Generate a detailed weekly study report
     const report = generateWeeklyStudyReport(result, smartInsights, profile);
-
     setWeeklyReport(report);
 
+    // Update chart data and finish loading
     setWeeklyData(weekly);
     setLoading(false);
+
+    const end = Date.now();
+
+    console.log(`Analytics Load Time: ${end - start} ms`);
   };
 
+  // Display loading indicator while analytics data is being processed
   if (loading) {
     return (
       <View style={styles.center}>
@@ -89,7 +110,7 @@ export default function ProgressScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 180 }}
+      contentContainerStyle={{ paddingBottom: 200 }}
     >
       <Text style={styles.title}>Your Progress 📈</Text>
 
@@ -317,8 +338,7 @@ export default function ProgressScreen() {
           </Text>
         </View>
       )}
-
-      <View style={styles.section}>
+      {/*<View style={styles.section}>
         <Text style={styles.sectionTitle}>Study Insights</Text>
 
         <View style={styles.insightCard}>
@@ -334,7 +354,7 @@ export default function ProgressScreen() {
               : "Complete more sessions to improve consistency."}
           </Text>
         </View>
-      </View>
+      </View>*/}
     </ScrollView>
   );
 }

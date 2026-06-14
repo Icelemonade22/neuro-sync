@@ -3,11 +3,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Text } from "react-native-paper";
 
@@ -15,16 +15,19 @@ export default function AdminRoomsScreen() {
   const [rooms, setRooms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Load study rooms when the screen opens
   useEffect(() => {
     loadRooms();
   }, []);
 
+  // Retrieve all study rooms
   const loadRooms = async () => {
     const data = await getAllStudyRooms();
     setRooms(data);
     setLoading(false);
   };
 
+  // Display loading indicator while rooms are loading
   if (loading) {
     return (
       <View style={styles.center}>

@@ -15,6 +15,9 @@ import {
 import { Button, Text } from "react-native-paper";
 
 export default function QuizScreen() {
+  // Extract the title, subject, and content parameters from the URL using
+  // the useLocalSearchParams hook provided by Expo Router.
+  // These parameters are used to generate the quiz based on the content of a study note.
   const { title, subject, content } = useLocalSearchParams();
 
   const [questions, setQuestions] = useState<any[]>([]);
@@ -33,11 +36,17 @@ export default function QuizScreen() {
 
   const [modalHeading, setModalHeading] = useState("Quiz Completed!");
   const [modalEmoji, setModalEmoji] = useState("🧠");
+  const [modalQueue, setModalQueue] = useState<any[]>([]);
 
+  // Function to handle quiz generation. It calls the generateQuiz function with
+  // the note's title, subject, content, and selected difficulty level.
   const handleGenerateQuiz = async () => {
     try {
+      // Set the loading state to true while the quiz is being generated.
       setLoading(true);
 
+      // Call the generateQuiz function with the note's title, subject, content,
+      // and selected difficulty level.
       const result = await generateQuiz(
         String(title ?? "Study Note"),
         String(subject ?? "General"),
@@ -45,14 +54,25 @@ export default function QuizScreen() {
         difficulty,
       );
 
+      // Update the component's state with the generated quiz questions,
+      // reset the selected answers, and mark the quiz as not submitted.
       setQuestions(result);
+
+      // Reset selected answers and submission state when a new quiz is generated.
       setSelectedAnswers({});
+
+      // Reset the submitted state to false when a new quiz is generated,
+      // allowing the user to take the quiz again.
       setSubmitted(false);
+
+      // Set the loading state to false after the quiz has been generated.
     } finally {
       setLoading(false);
     }
   };
 
+  // Calculate the user's score by comparing their selected answers to the correct answers
+  // for each question. The score is the total number of correct answers.
   const score = questions.reduce((total, q, index) => {
     return selectedAnswers[index] === q.answerIndex ? total + 1 : total;
   }, 0);
@@ -171,31 +191,98 @@ export default function QuizScreen() {
             </View>
           ))}
 
+          {/* Submit Button */}
           {!submitted ? (
             <Button
               mode="contained"
               style={styles.button}
               onPress={async () => {
+                {
+                  /* Mark the quiz as submitted to show the correct answers and 
+                  explanations.*/
+                }
                 setSubmitted(true);
 
+                {
+                  /* Calculate the reward for completing the quiz.*/
+                }
                 const reward = await rewardQuizXp(score);
 
+                {
+                  /* Check if the user has completed the quiz mission.*/
+                }
                 const missionCompleted = await completeMission("quiz");
 
-                setModalHeading(
-                  missionCompleted ? "Mission Completed!" : "Quiz Completed!",
-                );
+                {
+                  /* Prepare the modal queue for displaying achievements.*/
+                }
+                const queue = [];
 
-                setModalEmoji(missionCompleted ? "🎯" : "🧠");
+                {
+                  /* Check if the user has completed the quiz mission. */
+                }
+                if (missionCompleted) {
+                  queue.push({
+                    heading: "Mission Completed!",
+                    emoji: "🎯",
+                    title: "Complete 1 Quiz Mission Completed",
+                    xp: 20,
+                  });
+                }
 
-                setAchievementData({
-                  title: missionCompleted
-                    ? "Complete 1 Quiz Mission Completed"
-                    : (reward?.unlockedBadges?.[0] ??
-                      `Quiz Completed: ${score}/${questions.length}`),
-                  xp: missionCompleted ? 20 : (reward?.xpEarned ?? score * 10),
+                {
+                  /* Check if any badges were unlocked. */
+                }
+                if (reward?.unlockedBadges?.length) {
+                  queue.push({
+                    heading: "Achievement Unlocked!",
+                    emoji: "🏆",
+                    title: reward.unlockedBadges[0],
+                    xp: reward.xpEarned ?? score * 10,
+                  });
+                }
+
+                {
+                  /* Add the quiz completion modal to the queue. */
+                }
+                queue.push({
+                  heading: "Quiz Completed!",
+                  emoji: "🧠",
+                  title: `Quiz Completed: ${score}/${questions.length}`,
+                  xp: reward?.xpEarned ?? score * 10,
                 });
 
+                {
+                  /* Set the modal queue for displaying achievements. */
+                }
+                setModalQueue(queue);
+
+                {
+                  /* Display the first modal in the queue. */
+                }
+                const firstModal = queue[0];
+
+                {
+                  /* Display the first modal in the queue. */
+                }
+                setModalHeading(firstModal.heading);
+
+                {
+                  /* Set the emoji for the achievement modal. */
+                }
+                setModalEmoji(firstModal.emoji);
+
+                {
+                  /* Set the achievement data for the modal. */
+                }
+                setAchievementData({
+                  title: firstModal.title,
+                  xp: firstModal.xp,
+                });
+
+                {
+                  /* Display the achievement modal. */
+                }
                 setAchievementVisible(true);
               }}
             >
@@ -215,13 +302,49 @@ export default function QuizScreen() {
         </View>
       ) : null}
 
+      {/* Achievement Modal */}
       <AchievementModal
         visible={achievementVisible}
         heading={modalHeading}
         emoji={modalEmoji}
         title={achievementData.title}
         xp={achievementData.xp}
-        onClose={() => setAchievementVisible(false)}
+        onClose={() => {
+          {
+            /* Remove the first modal from the queue */
+          }
+          const remainingQueue = modalQueue.slice(1);
+
+          {
+            /* Display the next modal in the queue */
+          }
+          if (remainingQueue.length > 0) {
+            const nextModal = remainingQueue[0];
+
+            setModalQueue(remainingQueue);
+
+            setModalHeading(nextModal.heading);
+            setModalEmoji(nextModal.emoji);
+
+            {
+              /* Set the achievement data for the modal */
+            }
+            setAchievementData({
+              title: nextModal.title,
+              xp: nextModal.xp,
+            });
+
+            {
+              /* Display the next modal */
+            }
+            setAchievementVisible(true);
+          } else {
+            {
+              /* Hide the achievement modal */
+            }
+            setAchievementVisible(false);
+          }
+        }}
       />
     </ScrollView>
   );

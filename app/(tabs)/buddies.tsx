@@ -1,3 +1,4 @@
+// app/(tabs)/buddies.tsx
 import { auth } from "@/config/firebase";
 import {
   getOutgoingBuddyRequests,
@@ -19,6 +20,9 @@ import {
 } from "react-native";
 import { Button, Checkbox, Modal, Portal, Text } from "react-native-paper";
 
+// Study buddy matching screen.
+// Displays compatible study partners and allows users
+// to connect, manage requests, and report users.
 export default function BuddiesScreen() {
   const [loading, setLoading] = useState(true);
   const [matches, setMatches] = useState<any[]>([]);
@@ -38,6 +42,7 @@ export default function BuddiesScreen() {
     "Other",
   ];
 
+  // Add or remove a selected report reason.
   const toggleReason = (reason: string) => {
     setSelectedReasons((prev) =>
       prev.includes(reason)
@@ -46,31 +51,44 @@ export default function BuddiesScreen() {
     );
   };
 
+  // Load study buddy matches when the screen opens.
   useEffect(() => {
     loadMatches();
   }, []);
 
+  // Retrieve user profile, buddy requests,
+  // and compatible study buddy matches.
   const loadMatches = async () => {
     const user = auth.currentUser;
     if (!user) return;
 
+    // Get existing buddy requests sent by the user.
     const outgoingRequests = await getOutgoingBuddyRequests(user.uid);
 
+    // Store users with pending requests.
     const pendingIds = outgoingRequests
       .filter((request: any) => request.status === "pending")
       .map((request: any) => request.toUserId);
 
+    // Store users already connected as study buddies.
     const acceptedIds = outgoingRequests
       .filter((request: any) => request.status === "accepted")
       .map((request: any) => request.toUserId);
 
+    // Update pending request list.
     setSentRequestIds(pendingIds);
+
+    // Update connected buddy list.
     setConnectedBuddyIds(acceptedIds);
 
+    // Load current user profile and warning count.
     const profile = await getUserProfile(user.uid);
     setCurrentProfile(profile);
+
+    // Retrieve potential study buddy matches.
     const users = await getStudyBuddies(user.uid);
 
+    // Rank users based on compatibility score.
     const rankedMatches = users
       .map((otherUser: any) => ({
         ...otherUser,
@@ -78,21 +96,30 @@ export default function BuddiesScreen() {
       }))
       .sort((a, b) => b.compatibility - a.compatibility);
 
+    // Update the displayed buddy matches.
     setMatches(rankedMatches);
     setLoading(false);
   };
 
+  // Send a study buddy request to a matched user.
   const handleConnect = async (buddy: any) => {
     const user = auth.currentUser;
     if (!user) return;
 
+    // Validate the user's warning count before allowing them to send a
+    // buddy request.
     try {
       setConnectingId(buddy.id);
 
+      // Fetch the current user's profile to check their warning count
+      // and ensure they appear
       const profile = await getUserProfile(user.uid);
 
+      // Update the current user's online status in Firestore to ensure
+      // they appear
       setCurrentProfile(profile);
 
+      // Restrict buddy matching for users with multiple warnings.
       if ((currentProfile?.warningCount ?? 0) >= 3) {
         Alert.alert(
           "Restricted",
@@ -101,6 +128,7 @@ export default function BuddiesScreen() {
         return;
       }
 
+      // Create a buddy request with compatibility data.
       const result = await sendBuddyRequest({
         fromUserId: user.uid,
         fromName: currentProfile?.fullName ?? "Student",
@@ -109,12 +137,16 @@ export default function BuddiesScreen() {
         compatibility: buddy.compatibility,
       });
 
+      // If the request was not successful (e.g., already sent),
+      // show an alert and optimistically add the buddy ID to the
+      // sentRequestIds to update the UI accordingly.
       if (!result.success) {
         Alert.alert("Already Sent", result.message);
         setSentRequestIds((prev) => [...prev, buddy.uid]);
         return;
       }
 
+      // Update the UI after sending the request.
       setSentRequestIds((prev) => [...prev, buddy.uid]);
 
       Alert.alert("Request Sent", `Buddy request sent to ${buddy.fullName}.`);
@@ -126,19 +158,23 @@ export default function BuddiesScreen() {
     }
   };
 
+  // Report a user to the admin for review.
   const handleReportUser = async (buddy: any) => {
     const user = auth.currentUser;
 
+    // Ensure the user is logged in.
     if (!user) {
       Alert.alert("Error", "You must be logged in to report a user.");
       return;
     }
 
+    // Require at least one report reason.
     if (selectedReasons.length === 0) {
       Alert.alert("Select Reason", "Please select at least one reason.");
       return;
     }
 
+    // Submit the user report to Firestore.
     try {
       await createReport({
         type: "User Report",
@@ -152,6 +188,7 @@ export default function BuddiesScreen() {
 
       Alert.alert("Reported", "This user has been reported to the admin.");
 
+      // Clear report selections.
       setReportingUser(null);
       setSelectedReasons([]);
     } catch (error: any) {
@@ -159,6 +196,7 @@ export default function BuddiesScreen() {
     }
   };
 
+  // Display loading indicator while data is loading.
   if (loading) {
     return (
       <View style={styles.center}>
@@ -179,15 +217,41 @@ export default function BuddiesScreen() {
 
       <View style={styles.quickActions}>
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/requests")}
+          style={[
+            styles.actionButton,
+            (currentProfile?.warningCount ?? 0) >= 3 && styles.disabledButton,
+          ]}
+          onPress={() => {
+            if ((currentProfile?.warningCount ?? 0) >= 3) {
+              Alert.alert(
+                "Restricted",
+                "Buddy requests are temporarily unavailable due to multiple warnings.",
+              );
+              return;
+            }
+
+            router.push("/requests");
+          }}
         >
           <Text style={styles.actionText}>Requests</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/rooms")}
+          style={[
+            styles.actionButton,
+            (currentProfile?.warningCount ?? 0) >= 3 && styles.disabledButton,
+          ]}
+          onPress={() => {
+            if ((currentProfile?.warningCount ?? 0) >= 3) {
+              Alert.alert(
+                "Restricted",
+                "Study rooms are temporarily unavailable due to multiple warnings.",
+              );
+              return;
+            }
+
+            router.push("/rooms");
+          }}
         >
           <Text style={styles.actionText}>Rooms</Text>
         </TouchableOpacity>
@@ -507,5 +571,8 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderRadius: 20,
     backgroundColor: "#8B5CF6",
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
 });

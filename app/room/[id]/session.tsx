@@ -1,3 +1,4 @@
+//app/room/[id]/session.tsx
 import AchievementModal from "@/components/achievementModal";
 import { auth, db } from "@/config/firebase";
 import {
@@ -40,6 +41,13 @@ import { Button, Text, TextInput } from "react-native-paper";
 const SESSION_DURATION = 30;
 
 export default function SharedRoomSessionScreen() {
+  // Shared study room session screen.
+  // Allows users to:
+  // - Participate in a synchronized study session
+  // - Chat with study partners
+  // - Share PDF study materials
+  // - Join a video meeting
+  // - Earn XP, badges, and streak rewards
   const { id } = useLocalSearchParams();
   const roomId = typeof id === "string" ? id : "";
 
@@ -55,6 +63,8 @@ export default function SharedRoomSessionScreen() {
 
   const [achievementVisible, setAchievementVisible] = useState(false);
 
+  const [rewardShown, setRewardShown] = useState(false);
+
   const [achievementData, setAchievementData] = useState({
     title: "",
     xp: 0,
@@ -62,10 +72,13 @@ export default function SharedRoomSessionScreen() {
 
   const [activeTab, setActiveTab] = useState("chat");
 
+  // Load room and session data when the screen opens
   useEffect(() => {
     loadRoomAndSession();
   }, []);
 
+  // Listen for real-time session updates from Firestore.
+  // Keeps the timer synchronized across all participants.
   useEffect(() => {
     if (!sessionId) return;
 
@@ -77,8 +90,23 @@ export default function SharedRoomSessionScreen() {
   }, [sessionId]);
 
   useEffect(() => {
+    if (!session?.completed || rewardShown) return;
+
+    setRewardShown(true);
+    rewardSharedSession();
+  }, [session?.completed]);
+
+  // Session countdown timer.
+  // Only the host updates the timer to prevent multiple users
+  // from changing the countdown at the same time.
+  useEffect(() => {
     const currentUserId = auth.currentUser?.uid;
 
+    // Stop execution when:
+    // - the session is not running
+    // - the countdown has already finished
+    // - there is no active session ID
+    // - the current user is not the session host
     if (
       !session?.isRunning ||
       session.secondsLeft <= 0 ||
@@ -88,9 +116,12 @@ export default function SharedRoomSessionScreen() {
       return;
     }
 
+    // Execute every second to update the countdown timer
     const timer = setInterval(async () => {
       const nextSeconds = session.secondsLeft - 1;
 
+      // When the timer reaches zero,
+      // mark the session as completed and record the end time
       if (nextSeconds <= 0) {
         await updateRoomSession(sessionId, {
           secondsLeft: 0,
@@ -99,18 +130,26 @@ export default function SharedRoomSessionScreen() {
           endedAt: serverTimestamp(),
         });
 
+        // Trigger session completion logic
         await completeRoomSession(sessionId);
         return;
       }
 
+      // Update the remaining time in Firestore
+      // so all participants receive synchronized timer updates
       await updateRoomSession(sessionId, {
         secondsLeft: nextSeconds,
       });
     }, 1000);
 
+    // Clean up the timer when the component re-renders
+    // or when the user leaves the screen
     return () => clearInterval(timer);
   }, [session?.isRunning, session?.secondsLeft, sessionId]);
 
+  // Track participant presence in the room.
+  // Marks the current user as online when they enter
+  // and offline when they leave.
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (!sessionId || !currentUser) return;
@@ -130,6 +169,7 @@ export default function SharedRoomSessionScreen() {
     };
   }, [sessionId]);
 
+  // Listen for real-time chat messages in the study room
   useEffect(() => {
     if (!roomId) return;
 
@@ -140,6 +180,7 @@ export default function SharedRoomSessionScreen() {
     return unsubscribe;
   }, [roomId]);
 
+  // Listen for PDF files shared by room participants
   useEffect(() => {
     if (!roomId) return;
 
@@ -150,6 +191,8 @@ export default function SharedRoomSessionScreen() {
     return unsubscribe;
   }, [roomId]);
 
+  // Load room information and retrieve the latest active session.
+  // If no active session exists, create a new shared study session.
   const loadRoomAndSession = async () => {
     if (!roomId) return;
 
@@ -196,12 +239,14 @@ export default function SharedRoomSessionScreen() {
     setLoading(false);
   };
 
+  // Convert seconds into MM:SS format for the countdown timer
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
+  // Start or pause the shared study session.
   const handleStartPause = async () => {
     if (!sessionId || !session) return;
 
@@ -218,6 +263,7 @@ export default function SharedRoomSessionScreen() {
       startedAt: session.startedAt ?? serverTimestamp(),
     });
 
+    // Notifies other participants when the session starts.
     if (isStarting && room?.participants?.length > 0) {
       const targetUsers = room.participants.filter(
         (userId: string) => userId !== currentUser?.uid,
@@ -242,9 +288,12 @@ export default function SharedRoomSessionScreen() {
     }
   };
 
+  // Reset the current study session to its initial state
   const handleReset = async () => {
+    // Stop if there is no active session
     if (!sessionId) return;
 
+    // Restore the original session duration and clear completion status
     await updateRoomSession(sessionId, {
       secondsLeft: SESSION_DURATION,
       isRunning: false,
@@ -253,28 +302,14 @@ export default function SharedRoomSessionScreen() {
     });
   };
 
+  // Complete the study session before the timer reaches zero
   const handleCompleteEarly = async () => {
     if (!sessionId) return;
 
     await completeRoomSession(sessionId);
-
-    const user = auth.currentUser;
-
-    if (user) {
-      await awardUserXP(user.uid, 30);
-      await updateStudyStreak(user.uid);
-
-      const unlocked = await unlockBadge(user.uid, "Collaborative Learner");
-
-      setAchievementData({
-        title: unlocked ? "Collaborative Learner" : "Shared Session Completed",
-        xp: 30,
-      });
-
-      setAchievementVisible(true);
-    }
   };
 
+  // Display a loading indicator while room and session data are being retrieved
   if (loading || !session) {
     return (
       <View style={styles.center}>
@@ -283,11 +318,15 @@ export default function SharedRoomSessionScreen() {
     );
   }
 
+  // Format participant names for display in the shared study room
   const participantNames = room?.participantNames?.join(" & ") ?? "Study Room";
 
+  // Send a chat message to the shared study room
   const handleSendMessage = async () => {
+    // Prevent sending empty messages or messages from unauthenticated users
     if (!auth.currentUser || !messageText.trim()) return;
 
+    // Save the message to Firestore so all participants can see it in real time
     await sendRoomMessage(
       roomId,
       auth.currentUser.uid,
@@ -295,6 +334,7 @@ export default function SharedRoomSessionScreen() {
       messageText,
     );
 
+    // Notify other room participants about the new message
     if (room?.participants?.length > 0) {
       await Promise.all(
         room.participants
@@ -312,35 +352,64 @@ export default function SharedRoomSessionScreen() {
       );
     }
 
+    // Clear the message input after successful delivery
     setMessageText("");
   };
 
+  // Upload a PDF study resource to the shared study room
   const handleUploadFile = async () => {
+    // Open the device file picker and allow PDF files only
     const result = await DocumentPicker.getDocumentAsync({
       type: "application/pdf",
       copyToCacheDirectory: true,
     });
 
+    // Stop if the user cancels file selection
     if (result.canceled) return;
 
     const file = result.assets[0];
 
+    // Get the currently logged-in user
     const user = auth.currentUser;
 
+    // Stop if no authenticated user is found
     if (!user) return;
 
+    // Upload the selected PDF file to the shared room
     await uploadRoomFile(roomId, file.uri, file.name, user.email ?? "Student");
   };
 
+  // Format chat message timestamps into a readable HH:MM format
   const formatMessageTime = (createdAt: any) => {
+    // Return an empty string if the timestamp is unavailable
     if (!createdAt) return "";
 
+    // Convert Firestore timestamp into a JavaScript Date object
     const date = createdAt.toDate();
 
+    // Display only hours and minutes in the chat interface
     return date.toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const rewardSharedSession = async () => {
+    const user = auth.currentUser;
+
+    if (!user) return;
+
+    await awardUserXP(user.uid, 30);
+    await updateStudyStreak(user.uid);
+
+    const unlocked = await unlockBadge(user.uid, "Collaborative Learner");
+
+    setAchievementData({
+      title: unlocked ? "Collaborative Learner" : "Shared Session Completed",
+      xp: 30,
+    });
+
+    setAchievementVisible(true);
   };
 
   return (
@@ -390,10 +459,16 @@ export default function SharedRoomSessionScreen() {
           icon="video"
           style={styles.meetingButton}
           onPress={() => {
+            {
+              /* Generate a unique Jitsi meeting room name based on the study room name */
+            }
             const meetingName =
               room?.name?.replace(/\s+/g, "-").toLowerCase() ??
               `room-${roomId}`;
 
+            {
+              /* Open the shared video meeting for room participants */
+            }
             Linking.openURL(`https://meet.jit.si/neurosync-${meetingName}`);
           }}
         >
@@ -440,10 +515,9 @@ export default function SharedRoomSessionScreen() {
           >
             Reset
           </Button>
-
-          <Button mode="text" onPress={handleCompleteEarly}>
+          {/*<Button mode="text" onPress={handleCompleteEarly}>
             Complete Session
-          </Button>
+          </Button>*/}
         </>
       )}
 
